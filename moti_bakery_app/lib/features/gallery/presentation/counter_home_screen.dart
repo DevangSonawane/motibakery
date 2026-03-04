@@ -1,14 +1,13 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../app/theme.dart';
-import '../../../shared/models/cake.dart';
+import '../../../shared/models/product.dart';
 import '../../../shared/providers/auth_provider.dart';
-import '../../../shared/providers/gallery_provider.dart';
+import '../../../shared/providers/inventory_provider.dart';
+import '../../../shared/services/product_service.dart';
 import '../../../shared/widgets/counter_bottom_nav.dart';
 
 class CounterHomeScreen extends ConsumerWidget {
@@ -16,10 +15,10 @@ class CounterHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cakesState = ref.watch(cakesProvider);
-    final filtered = ref.watch(filteredCakesProvider);
-    final categories = ref.watch(categoriesProvider);
-    final selected = ref.watch(selectedCategoriesProvider);
+    final productsState = ref.watch(inventoryProductsProvider);
+    final filteredProducts = ref.watch(filteredInventoryProductsProvider);
+    final categories = ref.watch(inventoryCategoriesProvider);
+    final selectedCategory = ref.watch(selectedInventoryCategoryProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -40,10 +39,6 @@ class CounterHomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
             onPressed: () => ref.read(authControllerProvider).logout(),
             icon: const Icon(Icons.person_outline),
           ),
@@ -52,17 +47,17 @@ class CounterHomeScreen extends ConsumerWidget {
       bottomNavigationBar: const CounterBottomNav(currentIndex: 0),
       body: RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: () async => ref.refresh(cakesProvider.future),
+        onRefresh: () async => ref.refresh(inventoryProductsProvider.future),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: <Widget>[
             TextField(
               decoration: const InputDecoration(
-                hintText: 'Search cakes...',
+                hintText: 'Search inventory...',
                 prefixIcon: Icon(Icons.search),
               ),
               onChanged: (value) {
-                ref.read(searchQueryProvider.notifier).state = value;
+                ref.read(inventorySearchQueryProvider.notifier).state = value;
               },
             ),
             const SizedBox(height: 12),
@@ -70,42 +65,42 @@ class CounterHomeScreen extends ConsumerWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _CategoryChip(
+                  _FilterChip(
                     label: 'All',
-                    selected: selected.isEmpty,
+                    selected: selectedCategory == null,
                     onTap: () =>
-                        ref.read(selectedCategoriesProvider.notifier).state = <String>{},
+                        ref.read(selectedInventoryCategoryProvider.notifier).state = null,
                   ),
                   for (final category in categories)
-                    _CategoryChip(
+                    _FilterChip(
                       label: category,
-                      selected: selected.contains(category),
+                      selected: selectedCategory == category,
                       onTap: () {
-                        ref.read(selectedCategoriesProvider.notifier).state = <String>{
-                          category,
-                        };
+                        ref.read(selectedInventoryCategoryProvider.notifier).state = category;
                       },
                     ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            cakesState.when(
+            productsState.when(
               loading: _buildLoading,
               error: (error, _) => Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Unable to load cakes: $error'),
+                child: Text('Unable to load inventory: ${_errorMessage(error)}'),
               ),
               data: (_) {
-                if (filtered.isEmpty) {
+                if (filteredProducts.isEmpty) {
                   return SizedBox(
                     height: MediaQuery.sizeOf(context).height * 0.45,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.cake_outlined, size: 80, color: AppColors.textHint),
+                        const Icon(Icons.inventory_2_outlined,
+                            size: 80, color: AppColors.textHint),
                         const SizedBox(height: 12),
-                        Text('No cakes found', style: Theme.of(context).textTheme.headlineMedium),
+                        Text('No products found',
+                            style: Theme.of(context).textTheme.headlineMedium),
                         const SizedBox(height: 4),
                         Text(
                           'Try a different search or filter',
@@ -116,19 +111,14 @@ class CounterHomeScreen extends ConsumerWidget {
                   );
                 }
 
-                return GridView.builder(
+                return ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filtered.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.68,
-                  ),
+                  itemCount: filteredProducts.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
-                    final cake = filtered[index];
-                    return _CakeCard(cake: cake, index: index);
+                    final product = filteredProducts[index];
+                    return _InventoryCard(product: product, index: index);
                   },
                 );
               },
@@ -140,24 +130,20 @@ class CounterHomeScreen extends ConsumerWidget {
   }
 
   Widget _buildLoading() {
-    return GridView.builder(
+    return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: 4,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.68,
-      ),
+      itemCount: 6,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
           baseColor: AppColors.surfaceGray,
           highlightColor: AppColors.borderLight,
           period: 1200.ms,
           child: Container(
+            height: 88,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.borderLight),
               color: Colors.white,
             ),
@@ -166,10 +152,17 @@ class CounterHomeScreen extends ConsumerWidget {
       },
     );
   }
+
+  String _errorMessage(Object error) {
+    if (error is ProductException) {
+      return error.message;
+    }
+    return error.toString();
+  }
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -205,98 +198,76 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _CakeCard extends StatelessWidget {
-  const _CakeCard({required this.cake, required this.index});
+class _InventoryCard extends ConsumerWidget {
+  const _InventoryCard({required this.product, required this.index});
 
-  final Cake cake;
+  final Product product;
   final int index;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/cake-detail', extra: cake),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final values = product.optionValues;
+    final selected = ref.watch(selectedProductValueProvider(product.id));
+    final dropdownValue = selected != null && values.contains(selected)
+        ? selected
+        : (values.isNotEmpty ? values.first : null);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            product.displayTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+          ),
+          if (!product.isCake && dropdownValue != null) ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: dropdownValue,
+              decoration: const InputDecoration(
+                labelText: 'Value',
+                isDense: true,
+              ),
+              items: values
+                  .map(
+                    (value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(
+                        value,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (next) {
+                ref.read(selectedProductValueProvider(product.id).notifier).state = next;
+              },
             ),
           ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              flex: 7,
-              child: Hero(
-                tag: 'cake_image_${cake.id}',
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: CachedNetworkImage(
-                    imageUrl: cake.imageUrl,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const ColoredBox(
-                      color: AppColors.primaryPale,
-                      child: Icon(Icons.cake, color: AppColors.primary),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      cake.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            height: 1.15,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${cake.minWeight} kg - ${cake.maxWeight} kg',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontSize: 11,
-                            height: 1.2,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '₹${(cake.baseRate ?? 0).toStringAsFixed(0)}/kg',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            height: 1.2,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      )
-          .animate(delay: Duration(milliseconds: 60 * index))
-          .fadeIn(duration: 250.ms)
-          .slideY(begin: 0.2, end: 0, duration: 250.ms),
-    );
+        ],
+      ),
+    )
+        .animate(delay: Duration(milliseconds: 40 * index))
+        .fadeIn(duration: 220.ms)
+        .slideY(begin: 0.1, end: 0, duration: 220.ms);
   }
 }

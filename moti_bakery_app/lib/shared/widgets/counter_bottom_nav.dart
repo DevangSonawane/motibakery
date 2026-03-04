@@ -28,9 +28,9 @@ class CounterBottomNav extends StatelessWidget {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.cake_outlined),
-            activeIcon: Icon(Icons.cake),
-            label: 'Gallery',
+            icon: Icon(Icons.inventory_2_outlined),
+            activeIcon: Icon(Icons.inventory_2),
+            label: 'Inventory',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_outlined),

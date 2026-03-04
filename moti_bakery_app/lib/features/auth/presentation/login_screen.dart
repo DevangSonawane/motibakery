@@ -91,7 +91,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 32),
                     TextFormField(
                       controller: _emailController,
-                      autofocus: true,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(

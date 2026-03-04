@@ -17,3 +17,9 @@ flutter run \
 ```
 
 If these `--dart-define` values are not provided, the app falls back to demo/mock services.
+
+Reuse Supabase values from the React app `.env` automatically:
+
+```bash
+./scripts/run_with_react_supabase_env.sh
+```
