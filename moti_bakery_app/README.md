@@ -1,24 +1,19 @@
 # moti_bakery_app
 
-## Structure
+## Flutter + Supabase setup
 
-- `client/` React frontend (Vite)
-- `server/` Node backend scaffold (Express)
-- `supabase/` SQL + edge function files
-- Flutter app remains in root (`lib/`, `android/`, `ios/`, etc.)
-
-## Run Frontend
+Install dependencies:
 
 ```bash
-cd client
-npm install
-npm run dev
+flutter pub get
 ```
 
-## Run Server
+Run with Supabase project values:
 
 ```bash
-cd server
-npm install
-npm run dev
+flutter run \
+  --dart-define=SUPABASE_URL=https://your-project-id.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=your_publishable_or_anon_key
 ```
+
+If these `--dart-define` values are not provided, the app falls back to demo/mock services.

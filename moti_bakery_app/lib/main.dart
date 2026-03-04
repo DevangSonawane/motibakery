@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/router.dart';
 import 'app/theme.dart';
+import 'shared/services/supabase_bootstrap.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseBootstrap.initialize();
+  SupabaseBootstrap.logStatus();
   runApp(const ProviderScope(child: MotiBakeryApp()));
 }
 
