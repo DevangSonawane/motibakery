@@ -6,8 +6,9 @@ import { UserForm } from '@/components/forms/UserForm';
 import { useCreateUser, useUsers } from '@/hooks/useUsers';
 
 const formatRole = (role) => {
-  if (role === 'cake_room') return 'Cake Room';
+  if (role === 'cake_room') return 'Cake';
   if (role === 'counter') return 'Counter';
+  if (role === 'admin') return 'Admin';
   return role || '-';
 };
 
@@ -31,7 +32,7 @@ function AddUserModal({ open, onClose, onSubmit, loading }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-modal">
         <h3 className="text-lg font-semibold text-gray-900">Add User</h3>
-        <p className="mt-1 text-sm text-gray-500">Create Counter or Cake Room access account.</p>
+        <p className="mt-1 text-sm text-gray-500">Create Counter, Cake, or Admin access account.</p>
         <div className="mt-5">
           <UserForm onSubmit={onSubmit} onCancel={onClose} loading={loading} />
         </div>
@@ -112,7 +113,8 @@ export function UsersPage() {
         >
           <option value="all">All Roles</option>
           <option value="counter">Counter</option>
-          <option value="cake_room">Cake Room</option>
+          <option value="cake_room">Cake</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
 

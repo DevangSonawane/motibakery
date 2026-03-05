@@ -6,10 +6,10 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../app/theme.dart';
 import '../../../shared/models/product.dart';
-import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/inventory_provider.dart';
 import '../../../shared/services/product_service.dart';
 import '../../../shared/widgets/counter_bottom_nav.dart';
+import '../../../shared/widgets/counter_logout_button.dart';
 import 'product_detail_screen.dart';
 
 class CounterHomeScreen extends ConsumerWidget {
@@ -45,12 +45,7 @@ class CounterHomeScreen extends ConsumerWidget {
             ],
           ),
         ),
-        actions: [
-          IconButton(
-            onPressed: () => ref.read(authControllerProvider).logout(),
-            icon: const Icon(Icons.person_outline),
-          ),
-        ],
+        actions: const [CounterLogoutButton()],
       ),
       bottomNavigationBar: const CounterBottomNav(currentIndex: 0),
       body: RefreshIndicator(

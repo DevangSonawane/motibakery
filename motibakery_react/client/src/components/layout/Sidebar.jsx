@@ -3,6 +3,7 @@ import { LayoutDashboard, Cake, IndianRupee, Users, ClipboardList, LogOut } from
 import { routes } from '@/config/routes';
 import { logoutFromSupabase } from '@/lib/supabaseAuth';
 import { useAuthStore } from '@/stores/authStore';
+import appLogo from '@/assets/images-3.png';
 
 const navItems = [
   { to: routes.dashboard, label: 'Dashboard', icon: LayoutDashboard },
@@ -28,10 +29,7 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-60 border-r border-sidebar-border bg-sidebar-bg text-sidebar-text">
       <div className="flex h-full flex-col">
         <div className="border-b border-sidebar-border px-5 py-6">
-          <h1 className="text-xl font-bold tracking-tight">
-            <span className="text-brand">moti</span>
-            <span className="text-white"> BAKERY</span>
-          </h1>
+          <img src={appLogo} alt="Motibakery logo" className="h-12 w-auto object-contain" />
           <p className="mt-1 text-xs text-sidebar-text/80">Admin CMS</p>
         </div>
 

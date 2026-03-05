@@ -80,6 +80,9 @@ final List<Order> mockOrders = <Order>[
     createdBy: 'usr-counter-01',
     customerName: 'Riya',
     customerPhone: '9876543210',
+    cakeImageUrl: mockCakes[0].imageUrl,
+    baseRatePerKg: 850,
+    flavourIncrementPerKg: 50,
   ),
   Order(
     id: 'ORD-1002',
@@ -94,5 +97,8 @@ final List<Order> mockOrders = <Order>[
     createdBy: 'usr-counter-02',
     customerName: 'Aarav',
     customerPhone: '9988776655',
+    cakeImageUrl: mockCakes[2].imageUrl,
+    baseRatePerKg: 980,
+    flavourIncrementPerKg: 98,
   ),
 ];

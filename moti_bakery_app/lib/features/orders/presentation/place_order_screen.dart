@@ -131,6 +131,20 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      final rules = ref.read(pricingRulesProvider).valueOrNull ?? const [];
+      final flavourIncrementPerKg = rules
+          .where(
+            (rule) =>
+                rule.flavour != null &&
+                rule.flavour!.toLowerCase() == _selectedFlavour.toLowerCase(),
+          )
+          .fold<double>(0, (sum, rule) {
+            final percentPart = rule.incrementPercent == null
+                ? 0
+                : (widget.cake.baseRate ?? 0) * (rule.incrementPercent! / 100);
+            return sum + rule.incrementAmount + percentPart;
+          });
+
       final random = Random();
       final now = DateTime.now();
       final order = Order(
@@ -150,6 +164,9 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
             ? null
             : _notesController.text.trim(),
         imageUrl: _referenceImage?.path,
+        cakeImageUrl: widget.cake.imageUrl,
+        baseRatePerKg: widget.cake.baseRate ?? 0,
+        flavourIncrementPerKg: flavourIncrementPerKg,
         totalPrice: totalPrice,
         status: OrderStatus.newOrder,
         createdAt: DateTime.now(),

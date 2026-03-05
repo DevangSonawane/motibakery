@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
-import '../../../shared/models/product.dart';
 import '../../../shared/config/supabase_config.dart';
+import '../../../shared/models/product.dart';
 import '../../orders/presentation/product_place_order_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -101,6 +101,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             Text(
               'No variants available',
               style: Theme.of(context).textTheme.bodyMedium,
+            )
+          else if (_variants.length == 1)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.primaryPale,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.primaryLight.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Text(
+                    _variants.first,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             )
           else
             Align(

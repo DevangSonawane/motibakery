@@ -5,6 +5,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { loginWithSupabaseEmailPassword } from '@/lib/supabaseAuth';
 import { useAuthStore } from '@/stores/authStore';
+import appLogo from '@/assets/images-3.png';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -43,9 +44,7 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-[420px] rounded-2xl bg-white p-8 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
-        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-brand-pale text-2xl font-bold text-brand">
-          MB
-        </div>
+        <img src={appLogo} alt="Motibakery logo" className="mx-auto mb-5 h-24 w-auto object-contain" />
         <h1 className="text-center text-2xl font-bold">Welcome back</h1>
         <p className="mt-2 text-center text-sm text-gray-400">Sign in to your admin account</p>
 

@@ -7,40 +7,18 @@ class AuthService {
   Future<AppUser> login({required String email, required String password}) async {
     final normalized = email.trim().toLowerCase();
 
-    if (SupabaseBootstrap.result.status == SupabaseBootstrapStatus.connected) {
-      return _loginViaSupabase(email: normalized, password: password);
-    }
-    if (SupabaseBootstrap.result.status == SupabaseBootstrapStatus.failed) {
+    if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
+      if (SupabaseBootstrap.result.status == SupabaseBootstrapStatus.failed) {
+        throw AuthException(
+          'Supabase connection failed. ${SupabaseBootstrap.result.message ?? ''}'.trim(),
+        );
+      }
       throw AuthException(
-        'Supabase connection failed. ${SupabaseBootstrap.result.message ?? ''}'.trim(),
+        'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.',
       );
     }
 
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (password.trim().length < 4) {
-      throw const AuthException('Invalid email or password');
-    }
-
-    if (normalized.contains('counter')) {
-      return AppUser(
-        id: 'usr-counter-01',
-        email: normalized,
-        role: UserRole.counter,
-        displayName: 'Counter Staff',
-      );
-    }
-    if (normalized.contains('cake')) {
-      return AppUser(
-        id: 'usr-cakeroom-01',
-        email: normalized,
-        role: UserRole.cakeRoom,
-        displayName: 'Cake Room Staff',
-      );
-    }
-
-    throw const AuthException(
-      'Use an email containing "counter" or "cake" for demo login.',
-    );
+    return _loginViaSupabase(email: normalized, password: password);
   }
 
   Future<void> logout() async {
@@ -72,9 +50,8 @@ class AuthService {
           .eq('uid', authUser.id)
           .maybeSingle();
 
-      final role = _resolveRoleFromProfileOrEmail(
-        roleValue: data is Map<String, dynamic> ? data['role']?.toString() : null,
-        email: email,
+      final role = _mapRole(
+        data is Map<String, dynamic> ? data['role']?.toString() : null,
       );
       final displayName = (data is Map<String, dynamic> &&
               (data['full_name']?.toString().trim().isNotEmpty ?? false))
@@ -114,23 +91,6 @@ class AuthService {
     }
   }
 
-  UserRole _resolveRoleFromProfileOrEmail({
-    required String? roleValue,
-    required String email,
-  }) {
-    try {
-      return _mapRole(roleValue);
-    } on AuthException {
-      final normalized = email.trim().toLowerCase();
-      if (normalized == 'aniketjha@gmail.com' || normalized.contains('counter')) {
-        return UserRole.counter;
-      }
-      if (normalized.contains('cake')) {
-        return UserRole.cakeRoom;
-      }
-      rethrow;
-    }
-  }
 }
 
 class AuthException implements Exception {

@@ -7,7 +7,7 @@ const userSchema = z.object({
   email: z.string().email('Enter a valid Gmail address').refine((value) => value.endsWith('@gmail.com'), {
     message: 'Only @gmail.com addresses are allowed',
   }),
-  role: z.enum(['counter', 'cake_room'], {
+  role: z.enum(['counter', 'cake_room', 'admin'], {
     errorMap: () => ({ message: 'Select a valid role' }),
   }),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -60,7 +60,8 @@ export function UserForm({ onSubmit, onCancel, loading = false }) {
           className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none ring-brand/20 focus:ring-2"
         >
           <option value="counter">Counter</option>
-          <option value="cake_room">Cake Room</option>
+          <option value="cake_room">Cake</option>
+          <option value="admin">Admin</option>
         </select>
         {errors.role ? <p className="mt-1 text-xs text-red-600">{errors.role.message}</p> : null}
       </div>

@@ -42,6 +42,10 @@ class _OrderConfirmationScreenState extends State<OrderConfirmationScreen> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
+    final size = MediaQuery.of(context).size;
+    final horizontalPadding = size.width < 360 ? 16.0 : 24.0;
+    final topSpacing = size.height < 700 ? 4.0 : 12.0;
+    final lottieSize = size.width < 360 ? 150.0 : 200.0;
 
     return PopScope(
       canPop: false,
@@ -54,92 +58,98 @@ class _OrderConfirmationScreenState extends State<OrderConfirmationScreen> {
           child: Stack(
             alignment: Alignment.topCenter,
             children: [
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: SizedBox(
-                        height: 200,
-                        width: 200,
-                        child: Lottie.network(
-                          'https://assets7.lottiefiles.com/packages/lf20_jbrw3hcz.json',
-                          repeat: false,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                                Icons.check_circle,
-                                size: 120,
-                                color: AppColors.primary,
-                              ),
+              LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        SizedBox(height: topSpacing),
+                        Center(
+                          child: SizedBox(
+                            height: lottieSize,
+                            width: lottieSize,
+                            child: Lottie.network(
+                              'https://assets7.lottiefiles.com/packages/lf20_jbrw3hcz.json',
+                              repeat: false,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                    Icons.check_circle,
+                                    size: 120,
+                                    color: AppColors.primary,
+                                  ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Order Placed Successfully!',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displayMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Order Summary',
-                              style: Theme.of(context).textTheme.headlineLarge,
-                            ),
-                            const SizedBox(height: 10),
-                            _line(context, 'Order ID', order.id, mono: true),
-                            _line(
-                              context,
-                              'Cake',
-                              '${order.cakeName} (${order.flavour})',
-                            ),
-                            _line(
-                              context,
-                              'Weight',
-                              '${order.weight.toStringAsFixed(1)} kg',
-                            ),
-                            _line(
-                              context,
-                              'Delivery',
-                              DateFormat(
-                                'dd MMMM yyyy',
-                              ).format(order.deliveryDate),
-                            ),
-                            _line(
-                              context,
-                              'Customer',
-                              order.customerName ?? '-',
-                            ),
-                            _line(context, 'Phone', order.customerPhone ?? '-'),
-                            _line(
-                              context,
-                              'Total Paid',
-                              '₹ ${order.totalPrice.toStringAsFixed(2)}',
-                            ),
-                          ],
+                        SizedBox(height: size.height < 700 ? 8 : 12),
+                        Text(
+                          'Order Placed Successfully!',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.displayMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Order Summary',
+                                  style: Theme.of(context).textTheme.headlineLarge,
+                                ),
+                                const SizedBox(height: 10),
+                                _line(context, 'Order ID', order.id, mono: true),
+                                _line(
+                                  context,
+                                  'Cake',
+                                  '${order.cakeName} (${order.flavour})',
+                                ),
+                                _line(
+                                  context,
+                                  'Weight',
+                                  '${order.weight.toStringAsFixed(1)} kg',
+                                ),
+                                _line(
+                                  context,
+                                  'Delivery',
+                                  DateFormat(
+                                    'dd MMMM yyyy',
+                                  ).format(order.deliveryDate),
+                                ),
+                                _line(
+                                  context,
+                                  'Customer',
+                                  order.customerName ?? '-',
+                                ),
+                                _line(context, 'Phone', order.customerPhone ?? '-'),
+                                _line(
+                                  context,
+                                  'Total Paid',
+                                  '₹ ${order.totalPrice.toStringAsFixed(2)}',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => context.go('/counter'),
+                          child: const Text('Place Another Order'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: () => context.go('/my-orders'),
+                          child: const Text('View My Orders'),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                     ),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: () => context.go('/counter'),
-                      child: const Text('Place Another Order'),
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton(
-                      onPressed: () => context.go('/my-orders'),
-                      child: const Text('View My Orders'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               ConfettiWidget(
@@ -167,27 +177,38 @@ class _OrderConfirmationScreenState extends State<OrderConfirmationScreen> {
     String value, {
     bool mono = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          SizedBox(width: 92, child: Text('$label:')),
-          Expanded(
-            child: SelectableText(
-              value,
-              style:
-                  (mono
-                          ? Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontFamily: 'monospace',
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                            )
-                          : Theme.of(context).textTheme.bodyLarge)
-                      ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 340;
+        final valueStyle =
+            (mono
+                    ? Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontFamily: 'monospace',
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      )
+                    : Theme.of(context).textTheme.bodyLarge)
+                ?.copyWith(fontWeight: FontWeight.w600);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: isNarrow
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$label:'),
+                    const SizedBox(height: 2),
+                    SelectableText(value, style: valueStyle),
+                  ],
+                )
+              : Row(
+                  children: [
+                    SizedBox(width: 92, child: Text('$label:')),
+                    Expanded(child: SelectableText(value, style: valueStyle)),
+                  ],
+                ),
+        );
+      },
     );
   }
 }

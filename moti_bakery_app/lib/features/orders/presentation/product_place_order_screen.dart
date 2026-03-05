@@ -11,6 +11,7 @@ import '../../../shared/models/order.dart';
 import '../../../shared/models/product.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/order_provider.dart';
+import '../../../shared/services/order_service.dart';
 
 class ProductOrderArgs {
   const ProductOrderArgs({
@@ -143,10 +144,13 @@ class _ProductPlaceOrderScreenState
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       context.go('/order-confirmation', extra: created);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      final message = error is OrderException
+          ? error.message
+          : 'Could not place order. Try again.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not place order. Try again.')),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {
@@ -238,23 +242,50 @@ class _ProductPlaceOrderScreenState
               },
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedVariant,
-              decoration: const InputDecoration(
-                labelText: 'Select variant/value',
+            if (_variants.length <= 1)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryPale,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primaryLight.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Text(
+                      _selectedVariant,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                initialValue: _selectedVariant,
+                decoration: const InputDecoration(
+                  labelText: 'Select variant/value',
+                ),
+                items: _variants
+                    .map(
+                      (variant) =>
+                          DropdownMenuItem(value: variant, child: Text(variant)),
+                    )
+                    .toList(growable: false),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedVariant = value);
+                  }
+                },
               ),
-              items: _variants
-                  .map(
-                    (variant) =>
-                        DropdownMenuItem(value: variant, child: Text(variant)),
-                  )
-                  .toList(growable: false),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedVariant = value);
-                }
-              },
-            ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _quantityController,

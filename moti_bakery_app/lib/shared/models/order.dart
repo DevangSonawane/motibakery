@@ -17,6 +17,9 @@ class Order {
     this.customerPhone,
     this.notes,
     this.imageUrl,
+    this.cakeImageUrl,
+    this.baseRatePerKg,
+    this.flavourIncrementPerKg,
   });
 
   final String id;
@@ -30,6 +33,9 @@ class Order {
   final String? customerPhone;
   final String? notes;
   final String? imageUrl;
+  final String? cakeImageUrl;
+  final double? baseRatePerKg;
+  final double? flavourIncrementPerKg;
   final double totalPrice;
   final OrderStatus status;
   final DateTime createdAt;
@@ -48,6 +54,9 @@ class Order {
       customerPhone: customerPhone,
       notes: notes,
       imageUrl: imageUrl,
+      cakeImageUrl: cakeImageUrl,
+      baseRatePerKg: baseRatePerKg,
+      flavourIncrementPerKg: flavourIncrementPerKg,
       totalPrice: totalPrice,
       status: status ?? this.status,
       createdAt: createdAt,

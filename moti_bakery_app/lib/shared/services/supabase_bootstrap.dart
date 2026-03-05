@@ -37,7 +37,7 @@ class SupabaseBootstrap {
       _result = const SupabaseBootstrapResult(
         status: SupabaseBootstrapStatus.notConfigured,
         message:
-            'Missing SUPABASE_URL / SUPABASE_ANON_KEY. Running with local mock services.',
+            'Missing SUPABASE_URL / SUPABASE_ANON_KEY.',
       );
       return _result!;
     }

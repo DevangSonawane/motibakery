@@ -1,5 +1,6 @@
 import { Bell, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import appLogo from '@/assets/images-3.png';
 
 export function Topbar() {
   const user = useAuthStore((state) => state.user);
@@ -16,6 +17,7 @@ export function Topbar() {
       </div>
 
       <div className="ml-auto flex items-center gap-4">
+        <img src={appLogo} alt="Motibakery logo" className="h-10 w-auto object-contain" />
         <button type="button" className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800">
           <Bell className="h-5 w-5" />
         </button>

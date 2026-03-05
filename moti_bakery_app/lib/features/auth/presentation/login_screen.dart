@@ -66,10 +66,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     const SizedBox(height: 24),
-                    const Icon(Icons.cake_rounded, size: 80, color: AppColors.primary)
-                        .animate()
-                        .fadeIn(duration: 300.ms)
-                        .slideY(begin: 0.25, end: 0, duration: 300.ms),
+                    Image.asset(
+                      'assets/images/images-3.png',
+                      height: 80,
+                      fit: BoxFit.contain,
+                    ).animate().fadeIn(duration: 300.ms).slideY(
+                      begin: 0.25,
+                      end: 0,
+                      duration: 300.ms,
+                    ),
                     const SizedBox(height: 12),
                     RichText(
                       textAlign: TextAlign.center,
