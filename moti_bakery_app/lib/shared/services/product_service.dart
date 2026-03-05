@@ -14,7 +14,10 @@ class ProductService {
     try {
       final rows = await Supabase.instance.client
           .from('products')
-          .select('*')
+          .select(
+            'id,handle,title,option1_name,option1_value,option2_name,option2_value,option3_name,option3_value,name,category,rate,weight,flavours,status,image,created_at,updated_at',
+          )
+          .eq('status', 'active')
           .order('created_at', ascending: false);
       return rows.map(Product.fromMap).toList(growable: false);
     } on PostgrestException catch (error) {

@@ -23,9 +23,9 @@ class OrderDetailScreen extends StatelessWidget {
               Text(
                 order.id,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppColors.primary,
-                      fontFamily: 'monospace',
-                    ),
+                  color: AppColors.primary,
+                  fontFamily: 'monospace',
+                ),
               ),
               StatusBadge(status: order.status),
             ],
@@ -38,15 +38,24 @@ class OrderDetailScreen extends StatelessWidget {
                 children: [
                   _line(context, 'Cake', order.cakeName),
                   _line(context, 'Flavour', order.flavour),
-                  _line(context, 'Weight', '${order.weight.toStringAsFixed(1)} kg'),
+                  _line(
+                    context,
+                    'Weight',
+                    '${order.weight.toStringAsFixed(1)} kg',
+                  ),
                   _line(
                     context,
                     'Delivery',
                     DateFormat('dd MMM yyyy').format(order.deliveryDate),
                   ),
                   _line(context, 'Customer', order.customerName ?? '-'),
+                  _line(context, 'Phone', order.customerPhone ?? '-'),
                   _line(context, 'Notes', order.notes ?? '-'),
-                  _line(context, 'Total', '₹ ${order.totalPrice.toStringAsFixed(2)}'),
+                  _line(
+                    context,
+                    'Total',
+                    '₹ ${order.totalPrice.toStringAsFixed(2)}',
+                  ),
                 ],
               ),
             ),
@@ -68,9 +77,9 @@ class OrderDetailScreen extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],

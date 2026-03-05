@@ -112,11 +112,23 @@ class Product {
   }
 
   List<String> get optionValues {
-    final values = <String>{
-      if ((option1Value ?? '').trim().isNotEmpty) option1Value!.trim(),
-      if ((option2Value ?? '').trim().isNotEmpty) option2Value!.trim(),
-      if ((option3Value ?? '').trim().isNotEmpty) option3Value!.trim(),
-    };
+    final values = <String>{};
+    void addRaw(String? raw) {
+      final normalized = raw?.trim() ?? '';
+      if (normalized.isEmpty) {
+        return;
+      }
+      for (final part in normalized.split(',')) {
+        final next = part.trim();
+        if (next.isNotEmpty) {
+          values.add(next);
+        }
+      }
+    }
+
+    addRaw(option1Value);
+    addRaw(option2Value);
+    addRaw(option3Value);
     return values.toList(growable: false);
   }
 

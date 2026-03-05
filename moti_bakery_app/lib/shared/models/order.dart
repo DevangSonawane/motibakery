@@ -14,6 +14,7 @@ class Order {
     required this.createdBy,
     this.deliveryTime,
     this.customerName,
+    this.customerPhone,
     this.notes,
     this.imageUrl,
   });
@@ -26,6 +27,7 @@ class Order {
   final DateTime deliveryDate;
   final DateTime? deliveryTime;
   final String? customerName;
+  final String? customerPhone;
   final String? notes;
   final String? imageUrl;
   final double totalPrice;
@@ -43,6 +45,7 @@ class Order {
       deliveryDate: deliveryDate,
       deliveryTime: deliveryTime,
       customerName: customerName,
+      customerPhone: customerPhone,
       notes: notes,
       imageUrl: imageUrl,
       totalPrice: totalPrice,

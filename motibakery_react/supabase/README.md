@@ -4,6 +4,8 @@
 Open Supabase SQL editor and run:
 
 - `supabase/sql/002_reset_users_minimal.sql`
+- `supabase/sql/003_create_products.sql`
+- `supabase/sql/004_seed_products_from_swiggy_menu.sql`
 
 This creates:
 - `public.users` table

@@ -1,0 +1,62 @@
+								Rate without GST		
+Sr No	Name Of product	veg/non veg	HSN Code	Variant1	Variant2	Variant3	GST %	Rate Variant1	Rate Variant 2	Rate Variant 3
+	Bread Toast Products									
+1	Moti Toast	Veg	19054000	250gms	500gms		5	55	110	
+2	Kaju Toast	Veg	19054000	250gms	500gms		5	65	130	
+3	Jeera Toast	Veg	19054000	250gms	500gms		5	55	110	
+4	Rogni	Veg	19054000	250gms	500gms		5	50	100	
+5	Irani Toast	Veg	19054000	250gms			5	65		
+6	Surti Farmas (Butter)	Veg	19054000	250gms	500gms		5	71	142	
+7	Cake rusk 300gms	Non Veg	19059010	1			5	209		
+
+	Khari									
+8	Butter Jeera Khari	Veg	19054000	500gms			18	146		
+9	Classic Khari	Veg	19054000	500gms			18	126		
+
+	Bread									
+10	Bread 1200 gms	Veg	19052000	1				104		
+11	Bread 800 gms	Veg	19052000	1				80		
+12	Bread 400 gms	Veg	19052000	1				51		
+
+	Sweets									
+13	Mohanthal	Veg	21069000	250gms	500gms	1kg	5	178	356	712
+14	Kaju Katli	Veg	21069000	250gms	500gms	1kg	5	285	570	1140
+15	Anjeer Katli	Veg	21069000	250gms	500gms	1kg	5	295	590	1180
+16	Khajur Bites	Veg	21069000	250gms	500gms	1kg	5	220	440	880
+17	Assorted Bites Box 250gm	Veg	21069000	250gms			5	310		
+18	Gulab Jamun	Veg	21069000	6pcs			5	198		
+19	Rasgulla	Veg	21069000	6pcs			5	105		
+20	Rasmalai	Veg	21069000	5pcs			5	245		
+21	Soan Papdi	Veg	21069000	250gms	500gms		5	153	306	
+
+	Cookies									
+22	Kaju Makroom [200 gms]	Non Veg	19053211	1			18	215		
+23	Almond Biscotti [300gms]	Veg	19053211	1			18	215		
+24	Egg Biscuit	Non Veg	19053211	250gms			18	97		
+25	Premium Butter Kaju Cookies	Veg	19053211	500gms			18	370		
+26	Premium Butter Kesar Pista Cookies	Veg	19053211	500gms			18	370		
+27	Badam Coconut Cookies	Veg	19053211	250gms	500gms		18	93	186	
+28	Dark Chocolate	Veg	19053211	300gms	500gms		18	112	186	
+29	Tutti Prutti Cookies	Veg	19053211	300gms	500gms		18	112	186	
+30	Small Nankhatai	Veg	19053211	250gms	500gms		18	73	146	
+31	Salted 	Veg	19053211	300gms	500gms		18	88	146	
+32	Special Assorted cookies	Veg	19053211	500gms			18	146		
+33	Dry Fruits Assorted Cookies	Veg	19053211	500gms			18	186		
+
+	Savoury									
+34	Veg Puff	Veg	19059030	1pcs			18	30		
+35	Paneer Puff	Veg	19059030	1pcs			18	35		
+36	Aloo Matar Puff	Veg	19059030	1pcs			18	30		
+37	Paneer Chilly Roll	Veg	19059030	1pcs			18	50		
+38	Chicken Puff	Non Veg	19059030	1pcs			18	35		
+39	Butter Chicken Roll	Non Veg	19059030	1pcs			18	55		
+40	Chicken Burger	Non Veg	19059030	1pcs			18	50		
+41	Chicken Chilli Roll	Non Veg	19059030	1pcs			18	50		
+
+	Eggless cake									
+41	Eggless Pineapple cake	Veg	19059010	500gms	1kg		18	300	600	
+42	Blackforest Cake	Veg	19059010	500gms	1kg		18	300	600	
+43	Chocolate Crunch Cake	Veg	19059010	500gms	1kg		18	360	720	
+44	Almond Honey cake	Veg	19059010	500gms	1kg		18	325	720	
+45	Chocolate Dairy Milk cake	veg	19059010	500gms			18	490		
+46	Chocolate Truffle Cake	Veg	19059010	500gms	1kg		18	415	830	

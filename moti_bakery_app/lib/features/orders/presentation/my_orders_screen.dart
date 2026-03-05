@@ -119,8 +119,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${order.weight.toStringAsFixed(1)} kg • ${order.flavour} • ${DateFormat('dd MMM').format(order.deliveryDate)}',
+                                'Variant: ${order.flavour} • ${DateFormat('dd MMM').format(order.deliveryDate)}',
                                 style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Amount: ₹ ${order.totalPrice.toStringAsFixed(2)}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),

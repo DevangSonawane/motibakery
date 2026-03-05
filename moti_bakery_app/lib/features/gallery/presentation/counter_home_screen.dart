@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../app/theme.dart';
@@ -9,6 +10,7 @@ import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/inventory_provider.dart';
 import '../../../shared/services/product_service.dart';
 import '../../../shared/widgets/counter_bottom_nav.dart';
+import 'product_detail_screen.dart';
 
 class CounterHomeScreen extends ConsumerWidget {
   const CounterHomeScreen({super.key});
@@ -28,11 +30,17 @@ class CounterHomeScreen extends ConsumerWidget {
             children: const [
               TextSpan(
                 text: 'moti',
-                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               TextSpan(
                 text: ' bakery',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -69,14 +77,24 @@ class CounterHomeScreen extends ConsumerWidget {
                     label: 'All',
                     selected: selectedCategory == null,
                     onTap: () =>
-                        ref.read(selectedInventoryCategoryProvider.notifier).state = null,
+                        ref
+                                .read(
+                                  selectedInventoryCategoryProvider.notifier,
+                                )
+                                .state =
+                            null,
                   ),
                   for (final category in categories)
                     _FilterChip(
                       label: category,
                       selected: selectedCategory == category,
                       onTap: () {
-                        ref.read(selectedInventoryCategoryProvider.notifier).state = category;
+                        ref
+                                .read(
+                                  selectedInventoryCategoryProvider.notifier,
+                                )
+                                .state =
+                            category;
                       },
                     ),
                 ],
@@ -87,7 +105,9 @@ class CounterHomeScreen extends ConsumerWidget {
               loading: _buildLoading,
               error: (error, _) => Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Unable to load inventory: ${_errorMessage(error)}'),
+                child: Text(
+                  'Unable to load inventory: ${_errorMessage(error)}',
+                ),
               ),
               data: (_) {
                 if (filteredProducts.isEmpty) {
@@ -96,11 +116,16 @@ class CounterHomeScreen extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.inventory_2_outlined,
-                            size: 80, color: AppColors.textHint),
+                        const Icon(
+                          Icons.inventory_2_outlined,
+                          size: 80,
+                          color: AppColors.textHint,
+                        ),
                         const SizedBox(height: 12),
-                        Text('No products found',
-                            style: Theme.of(context).textTheme.headlineMedium),
+                        Text(
+                          'No products found',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           'Try a different search or filter',
@@ -115,7 +140,8 @@ class CounterHomeScreen extends ConsumerWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: filteredProducts.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final product = filteredProducts[index];
                     return _InventoryCard(product: product, index: index);
@@ -141,9 +167,9 @@ class CounterHomeScreen extends ConsumerWidget {
           highlightColor: AppColors.borderLight,
           period: 1200.ms,
           child: Container(
-            height: 88,
+            height: 152,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.borderLight),
               color: Colors.white,
             ),
@@ -189,8 +215,8 @@ class _FilterChip extends StatelessWidget {
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: selected ? Colors.white : AppColors.textSecondary,
-                ),
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
           ),
         ),
       ),
@@ -198,76 +224,201 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _InventoryCard extends ConsumerWidget {
+class _InventoryCard extends StatelessWidget {
   const _InventoryCard({required this.product, required this.index});
 
   final Product product;
   final int index;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final values = product.optionValues;
-    final selected = ref.watch(selectedProductValueProvider(product.id));
-    final dropdownValue = selected != null && values.contains(selected)
-        ? selected
-        : (values.isNotEmpty ? values.first : null);
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            product.displayTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+    return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => context.push('/product-detail', extra: product),
+            child: Ink(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primaryPale, Colors.white],
                 ),
-          ),
-          if (!product.isCake && dropdownValue != null) ...[
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: dropdownValue,
-              decoration: const InputDecoration(
-                labelText: 'Value',
-                isDense: true,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.borderLight),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              items: values
-                  .map(
-                    (value) => DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(
-                        value,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      width: 108,
+                      height: 124,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ProductImageView(
+                            imagePath: product.image,
+                            productName: product.displayTitle,
+                          ),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.26),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            right: 8,
+                            bottom: 8,
+                            child: Text(
+                              product.displayTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  )
-                  .toList(growable: false),
-              onChanged: (next) {
-                ref.read(selectedProductValueProvider(product.id).notifier).state = next;
-              },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _MetaChip(
+                              label: product.category.trim().isEmpty
+                                  ? 'Product'
+                                  : product.category,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          product.displayTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                height: 1.25,
+                              ),
+                        ),
+                        if (values.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: values
+                                .take(3)
+                                .map((value) => _VariantChip(label: value))
+                                .toList(growable: false),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ],
-      ),
-    )
+          ),
+        )
         .animate(delay: Duration(milliseconds: 40 * index))
-        .fadeIn(duration: 220.ms)
-        .slideY(begin: 0.1, end: 0, duration: 220.ms);
+        .fadeIn(duration: 280.ms)
+        .slideY(
+          begin: 0.12,
+          end: 0,
+          duration: 280.ms,
+          curve: Curves.easeOutCubic,
+        )
+        .scale(
+          begin: const Offset(0.98, 0.98),
+          end: const Offset(1, 1),
+          duration: 280.ms,
+          curve: Curves.easeOutBack,
+        );
+  }
+
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VariantChip extends StatelessWidget {
+  const _VariantChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Text(
+        label,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
   }
 }

@@ -29,6 +29,7 @@ class PlaceOrderScreen extends ConsumerStatefulWidget {
 class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _customerController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _notesController = TextEditingController();
   final _weightController = TextEditingController();
   final _picker = ImagePicker();
@@ -50,6 +51,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   @override
   void dispose() {
     _customerController.dispose();
+    _phoneController.dispose();
     _notesController.dispose();
     _weightController.dispose();
     super.dispose();
@@ -138,9 +140,15 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
         flavour: _selectedFlavour,
         weight: _weight,
         deliveryDate: _deliveryDate,
-        customerName:
-            _customerController.text.trim().isEmpty ? null : _customerController.text.trim(),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        customerName: _customerController.text.trim().isEmpty
+            ? null
+            : _customerController.text.trim(),
+        customerPhone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
         imageUrl: _referenceImage?.path,
         totalPrice: totalPrice,
         status: OrderStatus.newOrder,
@@ -148,7 +156,9 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
         createdBy: user.id,
       );
 
-      final created = await ref.read(orderControllerProvider.notifier).placeOrder(order);
+      final created = await ref
+          .read(orderControllerProvider.notifier)
+          .placeOrder(order);
       if (!mounted) {
         return;
       }
@@ -201,13 +211,18 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total', style: Theme.of(context).textTheme.bodyMedium),
+                    Text(
+                      'Total',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 2),
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       transitionBuilder: (child, animation) => SlideTransition(
-                        position:
-                            Tween(begin: const Offset(0, 0.35), end: Offset.zero).animate(animation),
+                        position: Tween(
+                          begin: const Offset(0, 0.35),
+                          end: Offset.zero,
+                        ).animate(animation),
                         child: FadeTransition(opacity: animation, child: child),
                       ),
                       child: Text(
@@ -217,7 +232,8 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                           symbol: '₹ ',
                           decimalDigits: 2,
                         ).format(total),
-                        style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                        style: Theme.of(context).textTheme.displayLarge
+                            ?.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w700,
                             ),
@@ -260,14 +276,17 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _weightController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(hintText: 'Enter weight'),
                 validator: (value) {
                   final parsed = double.tryParse(value ?? '');
                   if (parsed == null) {
                     return 'Enter a valid number';
                   }
-                  if (parsed < widget.cake.minWeight || parsed > widget.cake.maxWeight) {
+                  if (parsed < widget.cake.minWeight ||
+                      parsed > widget.cake.maxWeight) {
                     return 'Allowed range: ${widget.cake.minWeight} - ${widget.cake.maxWeight} kg';
                   }
                   return null;
@@ -284,7 +303,9 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 value: _weight,
                 min: widget.cake.minWeight,
                 max: widget.cake.maxWeight,
-                divisions: ((widget.cake.maxWeight - widget.cake.minWeight) * 10).round(),
+                divisions:
+                    ((widget.cake.maxWeight - widget.cake.minWeight) * 10)
+                        .round(),
                 activeColor: AppColors.primary,
                 thumbColor: AppColors.primary,
                 onChanged: _syncWeight,
@@ -292,8 +313,14 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${widget.cake.minWeight} kg', style: Theme.of(context).textTheme.bodySmall),
-                  Text('${widget.cake.maxWeight} kg', style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    '${widget.cake.minWeight} kg',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    '${widget.cake.maxWeight} kg',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -301,7 +328,12 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 initialValue: _selectedFlavour,
                 decoration: const InputDecoration(labelText: 'Select flavour'),
                 items: widget.cake.flavours
-                    .map((flavour) => DropdownMenuItem(value: flavour, child: Text(flavour)))
+                    .map(
+                      (flavour) => DropdownMenuItem(
+                        value: flavour,
+                        child: Text(flavour),
+                      ),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value != null) {
@@ -310,13 +342,19 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              Text('Delivery Date', style: Theme.of(context).textTheme.bodyLarge),
+              Text(
+                'Delivery Date',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _pickDate,
                 borderRadius: BorderRadius.circular(8),
                 child: Ink(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.borderLight),
                     borderRadius: BorderRadius.circular(8),
@@ -336,6 +374,19 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Customer Name (optional)',
                   hintText: 'Name...',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Customer Phone (optional)',
+                  hintText: '10-digit number',
                 ),
               ),
               const SizedBox(height: 16),
@@ -374,7 +425,11 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                         child: const CircleAvatar(
                           radius: 10,
                           backgroundColor: Colors.black87,
-                          child: Icon(Icons.close, size: 12, color: Colors.white),
+                          child: Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

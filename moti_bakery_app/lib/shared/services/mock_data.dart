@@ -79,6 +79,7 @@ final List<Order> mockOrders = <Order>[
     createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
     createdBy: 'usr-counter-01',
     customerName: 'Riya',
+    customerPhone: '9876543210',
   ),
   Order(
     id: 'ORD-1002',
@@ -92,5 +93,6 @@ final List<Order> mockOrders = <Order>[
     createdAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 15)),
     createdBy: 'usr-counter-02',
     customerName: 'Aarav',
+    customerPhone: '9988776655',
   ),
 ];

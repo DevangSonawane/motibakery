@@ -7,13 +7,16 @@ import '../features/cake_room/presentation/cake_room_dashboard_screen.dart';
 import '../features/cake_room/presentation/cake_room_order_detail_screen.dart';
 import '../features/gallery/presentation/cake_detail_screen.dart';
 import '../features/gallery/presentation/counter_home_screen.dart';
+import '../features/gallery/presentation/product_detail_screen.dart';
 import '../features/orders/presentation/my_orders_screen.dart';
 import '../features/orders/presentation/order_confirmation_screen.dart';
 import '../features/orders/presentation/order_detail_screen.dart';
 import '../features/orders/presentation/place_order_screen.dart';
+import '../features/orders/presentation/product_place_order_screen.dart';
 import '../shared/models/app_user.dart';
 import '../shared/models/cake.dart';
 import '../shared/models/order.dart';
+import '../shared/models/product.dart';
 import '../shared/providers/auth_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -31,6 +34,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final counterLocations = <String>{
         '/counter',
+        '/product-detail',
+        '/product-order',
         '/cake-detail',
         '/place-order',
         '/order-confirmation',
@@ -59,21 +64,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: <RouteBase>[
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/counter',
         builder: (context, state) => const CounterHomeScreen(),
       ),
       GoRoute(
+        path: '/product-detail',
+        builder: (context, state) =>
+            ProductDetailScreen(product: state.extra! as Product),
+      ),
+      GoRoute(
+        path: '/product-order',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is ProductOrderArgs) {
+            return ProductPlaceOrderScreen(
+              product: extra.product,
+              initialVariant: extra.initialVariant,
+            );
+          }
+          return ProductPlaceOrderScreen(product: extra! as Product);
+        },
+      ),
+      GoRoute(
         path: '/cake-detail',
-        builder: (context, state) => CakeDetailScreen(cake: state.extra! as Cake),
+        builder: (context, state) =>
+            CakeDetailScreen(cake: state.extra! as Cake),
       ),
       GoRoute(
         path: '/place-order',
-        builder: (context, state) => PlaceOrderScreen(cake: state.extra! as Cake),
+        builder: (context, state) =>
+            PlaceOrderScreen(cake: state.extra! as Cake),
       ),
       GoRoute(
         path: '/order-confirmation',

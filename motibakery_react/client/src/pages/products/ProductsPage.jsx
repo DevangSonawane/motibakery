@@ -13,6 +13,9 @@ const EMPTY_FORM = {
   category: '',
   rate: '',
   weight: '',
+  variant1: '',
+  variant2: '',
+  variant3: '',
   flavours: '1',
   option1Name: 'Title',
   option1Value: 'Default Title',
@@ -34,6 +37,18 @@ const EMPTY_FORM = {
   imageUrl: '',
 };
 
+const SWIGGY_CATEGORIES = [
+  'Bread Toast Products',
+  'Khari',
+  'Bread',
+  'Sweets',
+  'Cookies',
+  'Savoury',
+  'Eggless cake',
+];
+
+const WEIGHT_VARIANT_OPTIONS = ['1', '1pcs', '5pcs', '6pcs', '200gms', '250gms', '300gms', '400gms', '500gms', '800gms', '1kg', '1200gms'];
+
 const normalizeText = (value) => String(value || '').trim();
 const slugify = (value) =>
   normalizeText(value)
@@ -42,6 +57,12 @@ const slugify = (value) =>
     .replace(/^-+|-+$/g, '');
 
 const formatDisplayIndex = (index) => `#C${String(index).padStart(3, '0')}`;
+const extractWeightVariants = (weightValue) =>
+  normalizeText(weightValue)
+    .split(',')
+    .map((part) => normalizeText(part))
+    .filter(Boolean)
+    .slice(0, 3);
 
 function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelectAll, isSelected, isAllVisibleSelected) {
   return [
@@ -108,7 +129,7 @@ function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelec
   ];
 }
 
-function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isSaving, mode = 'create' }) {
+function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isSaving, mode = 'create', categories = [] }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/30 p-3 sm:p-4">
       <div className="mx-auto my-3 w-full max-w-2xl rounded-xl bg-white p-4 shadow-modal sm:my-6 sm:p-6">
@@ -149,12 +170,18 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
           </label>
           <label className="space-y-1 text-sm text-gray-700">
             <span>Category</span>
-            <input
+            <select
               value={form.category}
               onChange={(event) => onChange('category', event.target.value)}
               className="h-10 w-full rounded-md border border-gray-300 px-3"
-              placeholder="Cake, cookies, snacks..."
-            />
+            >
+              <option value="">Select category</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="space-y-1 text-sm text-gray-700">
             <span>Rate</span>
@@ -165,15 +192,35 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
               placeholder="₹350/kg"
             />
           </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Weight</span>
-            <input
-              value={form.weight}
-              onChange={(event) => onChange('weight', event.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 px-3"
-              placeholder="500g, 1kg"
-            />
-          </label>
+          <div className="space-y-1 text-sm text-gray-700">
+            <span>Weight Variants</span>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={form.variant1} onChange={(event) => onChange('variant1', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-2">
+                <option value="">Variant 1</option>
+                {WEIGHT_VARIANT_OPTIONS.map((variant) => (
+                  <option key={`v1-${variant}`} value={variant}>
+                    {variant}
+                  </option>
+                ))}
+              </select>
+              <select value={form.variant2} onChange={(event) => onChange('variant2', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-2">
+                <option value="">Variant 2</option>
+                {WEIGHT_VARIANT_OPTIONS.map((variant) => (
+                  <option key={`v2-${variant}`} value={variant}>
+                    {variant}
+                  </option>
+                ))}
+              </select>
+              <select value={form.variant3} onChange={(event) => onChange('variant3', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-2">
+                <option value="">Variant 3</option>
+                {WEIGHT_VARIANT_OPTIONS.map((variant) => (
+                  <option key={`v3-${variant}`} value={variant}>
+                    {variant}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <label className="space-y-1 text-sm text-gray-700">
             <span>Flavours</span>
             <input
@@ -289,6 +336,7 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
 }
 
 function toFormState(product) {
+  const [variant1 = '', variant2 = '', variant3 = ''] = extractWeightVariants(product.weight);
   return {
     handle: product.handle || '',
     title: product.title || product.name || '',
@@ -296,6 +344,9 @@ function toFormState(product) {
     category: product.category || '',
     rate: product.rate || '',
     weight: product.weight || '',
+    variant1,
+    variant2,
+    variant3,
     flavours: String(product.flavours || 1),
     option1Name: product.option1Name || 'Title',
     option1Value: product.option1Value || 'Default Title',
@@ -335,7 +386,7 @@ export function ProductsPage() {
   const importCakes = useImportCakes();
 
   const categories = useMemo(() => {
-    const values = Array.from(new Set(products.map((product) => product.category).filter(Boolean)));
+    const values = Array.from(new Set([...SWIGGY_CATEGORIES, ...products.map((product) => product.category).filter(Boolean)]));
     return values.sort((a, b) => a.localeCompare(b));
   }, [products]);
 
@@ -418,18 +469,22 @@ export function ProductsPage() {
       return;
     }
 
+    const selectedVariants = Array.from(
+      new Set([form.variant1, form.variant2, form.variant3].map((variant) => normalizeText(variant)).filter(Boolean))
+    );
+
     const payload = {
       handle: normalizeText(form.handle) || slugify(form.name || form.title),
       title: normalizeText(form.title) || normalizeText(form.name),
       name: normalizeText(form.name),
       category: normalizeText(form.category) || 'General',
       rate: normalizeText(form.rate) || '-',
-      weight: normalizeText(form.weight) || '-',
-      flavours: Number(form.flavours) || 1,
+      weight: selectedVariants.length ? selectedVariants.join(', ') : '-',
+      flavours: selectedVariants.length || Number(form.flavours) || 1,
       status: editingProduct?.status || 'active',
       image: normalizeText(form.imageUrl),
-      option1Name: normalizeText(form.option1Name),
-      option1Value: normalizeText(form.option1Value),
+      option1Name: normalizeText(form.option1Name) || 'Weight',
+      option1Value: selectedVariants.length ? selectedVariants.join(', ') : normalizeText(form.option1Value) || 'Default Title',
       option2Name: normalizeText(form.option2Name),
       option2Value: normalizeText(form.option2Value),
       option3Name: normalizeText(form.option3Name),
@@ -649,6 +704,7 @@ export function ProductsPage() {
       {isModalOpen ? (
         <AddProductModal
           form={form}
+          categories={categories}
           onChange={updateForm}
           onClose={() => {
             resetForm();

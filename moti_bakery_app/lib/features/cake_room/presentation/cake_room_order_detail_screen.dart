@@ -69,7 +69,9 @@ class _CakeRoomOrderDetailScreenState
     }
 
     setState(() => _updating = true);
-    await ref.read(orderControllerProvider.notifier).updateStatus(widget.order.id, status);
+    await ref
+        .read(orderControllerProvider.notifier)
+        .updateStatus(widget.order.id, status);
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -85,17 +87,21 @@ class _CakeRoomOrderDetailScreenState
         minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: switch (order.status) {
           OrderStatus.newOrder => ElevatedButton(
-              onPressed: _updating ? null : () => _confirmAndUpdate(OrderStatus.inProgress),
-              child: const Text('Start Preparation'),
-            ),
+            onPressed: _updating
+                ? null
+                : () => _confirmAndUpdate(OrderStatus.inProgress),
+            child: const Text('Start Preparation'),
+          ),
           OrderStatus.inProgress => ElevatedButton(
-              onPressed: _updating ? null : () => _confirmAndUpdate(OrderStatus.prepared),
-              child: const Text('Mark as Prepared'),
-            ),
+            onPressed: _updating
+                ? null
+                : () => _confirmAndUpdate(OrderStatus.prepared),
+            child: const Text('Mark as Prepared'),
+          ),
           OrderStatus.prepared => OutlinedButton(
-              onPressed: null,
-              child: const Text('Already Prepared'),
-            ),
+            onPressed: null,
+            child: const Text('Already Prepared'),
+          ),
         },
       ),
       body: ListView(
@@ -106,16 +112,19 @@ class _CakeRoomOrderDetailScreenState
             children: [
               Text(
                 order.id,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineMedium
-                    ?.copyWith(color: AppColors.primary, fontFamily: 'monospace'),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontFamily: 'monospace',
+                ),
               ),
               StatusBadge(status: order.status),
             ],
           ),
           const SizedBox(height: 16),
-          Text(order.cakeName, style: Theme.of(context).textTheme.displayMedium),
+          Text(
+            order.cakeName,
+            style: Theme.of(context).textTheme.displayMedium,
+          ),
           const SizedBox(height: 8),
           Text(
             'Flavour: ${order.flavour}  |  Weight: ${order.weight.toStringAsFixed(1)} kg',
@@ -131,12 +140,23 @@ class _CakeRoomOrderDetailScreenState
             'Customer: ${order.customerName ?? '-'}',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Phone: ${order.customerPhone ?? '-'}',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           const SizedBox(height: 16),
           Text('Notes', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: 6),
-          Text(order.notes ?? '-', style: Theme.of(context).textTheme.bodyLarge),
+          Text(
+            order.notes ?? '-',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           const SizedBox(height: 16),
-          Text('Reference Image', style: Theme.of(context).textTheme.headlineLarge),
+          Text(
+            'Reference Image',
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
           const SizedBox(height: 8),
           if (order.imageUrl != null)
             InkWell(
@@ -148,7 +168,10 @@ class _CakeRoomOrderDetailScreenState
                     child: InteractiveViewer(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.file(File(order.imageUrl!), fit: BoxFit.contain),
+                        child: Image.file(
+                          File(order.imageUrl!),
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                   ),
@@ -161,7 +184,8 @@ class _CakeRoomOrderDetailScreenState
                   width: double.infinity,
                   height: 220,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _imagePlaceholder(),
+                  errorBuilder: (context, error, stackTrace) =>
+                      _imagePlaceholder(),
                 ),
               ),
             )
@@ -171,9 +195,9 @@ class _CakeRoomOrderDetailScreenState
           Text(
             'Total: ₹${order.totalPrice.toStringAsFixed(2)}',
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -188,7 +212,11 @@ class _CakeRoomOrderDetailScreenState
         color: AppColors.surfaceGray,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Icon(Icons.camera_alt_outlined, color: AppColors.textHint, size: 40),
+      child: const Icon(
+        Icons.camera_alt_outlined,
+        color: AppColors.textHint,
+        size: 40,
+      ),
     );
   }
 }
