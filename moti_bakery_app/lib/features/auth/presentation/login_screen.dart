@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
 import '../../../shared/providers/auth_provider.dart';
+import '../../../shared/providers/inventory_provider.dart';
 import '../../../utils/validators.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -31,10 +34,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    await ref.read(authControllerProvider).login(
+    final authController = ref.read(authControllerProvider);
+    await authController.login(
           email: _emailController.text,
           password: _passwordController.text,
         );
+    if (!mounted) {
+      return;
+    }
+
+    final user = authController.state.user;
+    if (user?.role.name == 'counter') {
+      unawaited(ref.read(inventoryProductsProvider.future));
+    }
   }
 
   @override
