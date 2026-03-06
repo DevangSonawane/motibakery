@@ -17,6 +17,8 @@ class AppColors {
   static const statusProgressBg = Color(0xFFE3F2FD);
   static const statusPrepared = Color(0xFF2E7D32);
   static const statusPreparedBg = Color(0xFFE8F5E9);
+  static const statusDelivered = Color(0xFF00695C);
+  static const statusDeliveredBg = Color(0xFFE0F2F1);
   static const error = Color(0xFFC62828);
   static const warning = Color(0xFFE65100);
 }

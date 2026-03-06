@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
@@ -45,12 +47,15 @@ class _ProductPlaceOrderScreenState
   final _customerPhoneController = TextEditingController();
   final _notesController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
+  final _picker = ImagePicker();
 
   late final List<String> _variants;
   late String _selectedVariant;
   int _quantity = 1;
   DateTime _deliveryDate = DateTime.now();
+  TimeOfDay _deliveryTime = TimeOfDay.now();
   bool _isSubmitting = false;
+  XFile? _referenceImage;
 
   @override
   void initState() {
@@ -81,6 +86,57 @@ class _ProductPlaceOrderScreenState
     );
     if (picked != null) {
       setState(() => _deliveryDate = picked);
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _deliveryTime,
+    );
+    if (picked != null) {
+      setState(() => _deliveryTime = picked);
+    }
+  }
+
+  Future<void> _pickReferenceImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) {
+      return;
+    }
+
+    final image = await _picker.pickImage(
+      source: source,
+      imageQuality: 80,
+      maxWidth: 800,
+    );
+    if (image != null) {
+      setState(() => _referenceImage = image);
     }
   }
 
@@ -122,16 +178,26 @@ class _ProductPlaceOrderScreenState
 
     try {
       final now = DateTime.now();
+      final scheduledDate = DateTime(_deliveryDate.year, _deliveryDate.month, _deliveryDate.day);
+      final scheduledTime = DateTime(
+        _deliveryDate.year,
+        _deliveryDate.month,
+        _deliveryDate.day,
+        _deliveryTime.hour,
+        _deliveryTime.minute,
+      );
       final order = Order(
         id: '#ORD-${now.year}-${1000 + Random().nextInt(8999)}',
         cakeId: widget.product.id,
         cakeName: widget.product.displayTitle,
         flavour: _selectedVariant,
         weight: _weightInKg(),
-        deliveryDate: _deliveryDate,
+        deliveryDate: scheduledDate,
+        deliveryTime: scheduledTime,
         customerName: _customerNameController.text.trim(),
         customerPhone: _customerPhoneController.text.trim(),
         notes: _buildNotes(),
+        imageUrl: _referenceImage?.path,
         totalPrice: _totalPrice(),
         status: OrderStatus.newOrder,
         createdAt: now,
@@ -159,13 +225,12 @@ class _ProductPlaceOrderScreenState
     }
   }
 
-  String _buildNotes() {
+  String? _buildNotes() {
     final raw = _notesController.text.trim();
-    final quantityNote = 'Quantity: $_quantity';
     if (raw.isEmpty) {
-      return quantityNote;
+      return null;
     }
-    return '$quantityNote | $raw';
+    return raw;
   }
 
   @override
@@ -327,6 +392,30 @@ class _ProductPlaceOrderScreenState
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            Text('Delivery Time', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickTime,
+              borderRadius: BorderRadius.circular(8),
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.borderLight),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time_outlined, size: 20),
+                    const SizedBox(width: 10),
+                    Text(_deliveryTime.format(context)),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _notesController,
@@ -337,6 +426,33 @@ class _ProductPlaceOrderScreenState
                 hintText: 'Special instructions...',
               ),
             ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: _pickReferenceImage,
+              icon: const Icon(Icons.add_a_photo_outlined),
+              label: const Text('Attach Reference Image'),
+            ),
+            if (_referenceImage != null) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  File(_referenceImage!.path),
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _referenceImage = null),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Remove image'),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),

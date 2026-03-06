@@ -131,15 +131,25 @@ class CounterHomeScreen extends ConsumerWidget {
                   );
                 }
 
-                return ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredProducts.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final product = filteredProducts[index];
-                    return _InventoryCard(product: product, index: index);
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 2;
+
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredProducts.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: crossAxisCount == 3 ? 0.78 : 0.7,
+                      ),
+                      itemBuilder: (context, index) {
+                        final product = filteredProducts[index];
+                        return _InventoryCard(product: product, index: index);
+                      },
+                    );
                   },
                 );
               },
@@ -151,24 +161,34 @@ class CounterHomeScreen extends ConsumerWidget {
   }
 
   Widget _buildLoading() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 6,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        return Shimmer.fromColors(
-          baseColor: AppColors.surfaceGray,
-          highlightColor: AppColors.borderLight,
-          period: 1200.ms,
-          child: Container(
-            height: 152,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.borderLight),
-              color: Colors.white,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 2;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: crossAxisCount * 3,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: crossAxisCount == 3 ? 0.78 : 0.7,
           ),
+          itemBuilder: (context, index) {
+            return Shimmer.fromColors(
+              baseColor: AppColors.surfaceGray,
+              highlightColor: AppColors.borderLight,
+              period: 1200.ms,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.borderLight),
+                  color: Colors.white,
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -227,39 +247,27 @@ class _InventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final values = product.optionValues;
+    // Only show product name; no category or variant detail.
 
     return Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
             onTap: () => context.push('/product-detail', extra: product),
-            child: Ink(
+              child: Ink(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.primaryPale, Colors.white],
-                ),
+                color: AppColors.primaryPale,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppColors.borderLight),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
               ),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: SizedBox(
-                      width: 108,
-                      height: 124,
+                  Expanded(
+                    flex: 7,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
@@ -279,65 +287,19 @@ class _InventoryCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Positioned(
-                            left: 8,
-                            right: 8,
-                            bottom: 8,
-                            child: Text(
-                              product.displayTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _MetaChip(
-                              label: product.category.trim().isEmpty
-                                  ? 'Product'
-                                  : product.category,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          product.displayTitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                                height: 1.25,
-                              ),
-                        ),
-                        if (values.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: values
-                                .take(3)
-                                .map((value) => _VariantChip(label: value))
-                                .toList(growable: false),
-                          ),
-                        ],
-                      ],
+                  const SizedBox(height: 10),
+                  Text(
+                    product.displayTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.2,
                     ),
                   ),
                 ],
@@ -361,59 +323,4 @@ class _InventoryCard extends StatelessWidget {
         );
   }
 
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VariantChip extends StatelessWidget {
-  const _VariantChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Text(
-        label,
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
 }

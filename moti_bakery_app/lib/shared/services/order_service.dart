@@ -6,6 +6,7 @@ import 'supabase_bootstrap.dart';
 class OrderService {
   static const _selectColumns =
       'order_id,cake_id,cake_name,flavour,weight,delivery_date,delivery_time,customer_name,customer_phone,notes,reference_image_url,cake_image_url,base_rate_per_kg,flavour_increment_per_kg,total_price,status,created_at,created_by';
+  static const int _myOrdersWindowDays = 15;
 
   Future<void> _requireConnected() async {
     if (SupabaseBootstrap.result.status == SupabaseBootstrapStatus.connected) {
@@ -23,15 +24,23 @@ class OrderService {
     );
   }
 
-  Future<List<Order>> fetchMyOrders(String userId) async {
+  Future<List<Order>> fetchMyOrders(String userId, {bool last15Only = true}) async {
     await _requireConnected();
     try {
-      final rows = await Supabase.instance.client
+      final query = Supabase.instance.client
           .from('orders')
           .select(_selectColumns)
-          .eq('created_by', userId)
-          .order('created_at', ascending: false);
-      return rows.map(_mapOrder).toList(growable: false);
+          .eq('created_by', userId);
+
+      if (last15Only) {
+        final cutoff = DateTime.now().toUtc().subtract(const Duration(days: _myOrdersWindowDays));
+        query.gte('created_at', cutoff.toIso8601String());
+      }
+
+      final rows = await query.order('created_at', ascending: false);
+      final orders = rows.map(_mapOrder).toList(growable: false);
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
     } on PostgrestException catch (error) {
       throw OrderException(error.message);
     } on AuthException catch (error) {
@@ -48,7 +57,9 @@ class OrderService {
           .from('orders')
           .select(_selectColumns)
           .order('created_at', ascending: false);
-      return rows.map(_mapOrder).toList(growable: false);
+      final orders = rows.map(_mapOrder).toList(growable: false);
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
     } on PostgrestException catch (error) {
       throw OrderException(error.message);
     } on AuthException catch (error) {
@@ -67,8 +78,8 @@ class OrderService {
         'cake_name': order.cakeName,
         'flavour': order.flavour,
         'weight': order.weight,
-        'delivery_date': order.deliveryDate.toIso8601String(),
-        'delivery_time': order.deliveryTime?.toIso8601String(),
+        'delivery_date': _toUtcIso(order.deliveryDate),
+        'delivery_time': order.deliveryTime == null ? null : _toUtcIso(order.deliveryTime!),
         'customer_name': order.customerName,
         'customer_phone': order.customerPhone,
         'notes': order.notes,
@@ -79,7 +90,7 @@ class OrderService {
         'flavour_increment_per_kg': order.flavourIncrementPerKg ?? 0,
         'total_price': order.totalPrice,
         'status': _statusToDb(order.status),
-        'created_at': order.createdAt.toIso8601String(),
+        'created_at': _toUtcIso(order.createdAt),
         'created_by': order.createdBy,
       };
       final row = await Supabase.instance.client
@@ -103,20 +114,22 @@ class OrderService {
   }) async {
     await _requireConnected();
     try {
-      final row = await Supabase.instance.client
+      final rows = await Supabase.instance.client
           .from('orders')
           .update({
             'status': _statusToDb(status),
-            'updated_at': DateTime.now().toIso8601String(),
+            'updated_at': _toUtcIso(DateTime.now()),
           })
           .eq('order_id', orderId)
           .select(_selectColumns)
-          .maybeSingle();
+          .limit(1);
 
-      if (row == null) {
-        throw const OrderException('Order not found');
+      if (rows.isEmpty) {
+        throw const OrderException(
+          'No order was updated. Check order ID and RLS policy permissions.',
+        );
       }
-      return _mapOrder(row);
+      return _mapOrder(rows.first);
     } on PostgrestException catch (error) {
       throw OrderException(error.message);
     } on AuthException catch (error) {
@@ -168,6 +181,8 @@ class OrderService {
     return 0;
   }
 
+  String _toUtcIso(DateTime value) => value.toUtc().toIso8601String();
+
   OrderStatus _statusFromDb(String? value) {
     switch (value?.toLowerCase()) {
       case 'new':
@@ -178,6 +193,8 @@ class OrderService {
         return OrderStatus.inProgress;
       case 'prepared':
         return OrderStatus.prepared;
+      case 'delivered':
+        return OrderStatus.delivered;
       default:
         return OrderStatus.newOrder;
     }
@@ -191,6 +208,8 @@ class OrderService {
         return 'in_progress';
       case OrderStatus.prepared:
         return 'prepared';
+      case OrderStatus.delivered:
+        return 'delivered';
     }
   }
 }

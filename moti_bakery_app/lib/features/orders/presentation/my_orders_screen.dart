@@ -21,6 +21,7 @@ class MyOrdersScreen extends ConsumerStatefulWidget {
 
 class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
   Timer? _pollTimer;
+  bool _last15Only = true;
 
   @override
   void initState() {
@@ -38,7 +39,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
   Future<void> _loadOrders() async {
     final user = ref.read(authControllerProvider).state.user;
     if (user != null && mounted) {
-      await ref.read(orderControllerProvider.notifier).loadMyOrders(user.id);
+      await ref
+          .read(orderControllerProvider.notifier)
+          .loadMyOrders(user.id, last15Only: _last15Only);
     }
   }
 
@@ -58,7 +61,10 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
           data: (orders) {
             if (orders.isEmpty) {
               return ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 children: [
+                  _buildFilterToggle(),
+                  const SizedBox(height: 16),
                   SizedBox(
                     height: MediaQuery.sizeOf(context).height * 0.5,
                     child: Column(
@@ -87,10 +93,18 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
 
             return ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              itemCount: orders.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemCount: orders.length + 1,
+              separatorBuilder: (context, index) {
+                if (index == 0) {
+                  return const SizedBox(height: 12);
+                }
+                return const Divider(height: 1);
+              },
               itemBuilder: (context, index) {
-                final order = orders[index];
+                if (index == 0) {
+                  return _buildFilterToggle();
+                }
+                final order = orders[index - 1];
                 return InkWell(
                   onTap: () => context.push('/order-detail', extra: order),
                   child: Padding(
@@ -139,13 +153,39 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                     ),
                   ),
                 )
-                    .animate(delay: Duration(milliseconds: 40 * index))
+                    .animate(delay: Duration(milliseconds: 40 * (index - 1)))
                     .fadeIn(duration: 200.ms)
                     .slideX(begin: 0.03, end: 0, duration: 200.ms);
               },
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildFilterToggle() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ToggleButtons(
+        borderRadius: BorderRadius.circular(10),
+        isSelected: [_last15Only, !_last15Only],
+        onPressed: (index) {
+          final nextValue = index == 0;
+          if (nextValue == _last15Only) return;
+          setState(() => _last15Only = nextValue);
+          _loadOrders();
+        },
+        children: const [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Text('Last 15 Days'),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Text('All'),
+          ),
+        ],
       ),
     );
   }

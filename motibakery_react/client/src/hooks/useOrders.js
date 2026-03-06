@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { listOrdersFromSupabase } from '@/lib/supabaseOrders';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { deleteOrderInSupabase, listOrdersFromSupabase } from '@/lib/supabaseOrders';
 
 export const useOrders = (filters = {}) =>
   useQuery({
@@ -16,3 +17,14 @@ export const useOrder = (id) =>
     },
     enabled: Boolean(id),
   });
+
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, orderId }) => deleteOrderInSupabase({ id, orderId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Order deleted');
+    },
+  });
+};

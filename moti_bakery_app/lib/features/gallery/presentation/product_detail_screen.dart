@@ -45,11 +45,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: SizedBox(
-              height: 260,
-              child: ProductImageView(
-                imagePath: widget.product.image,
-                productName: widget.product.displayTitle,
-                fit: BoxFit.cover,
+              height: 320,
+              child: ColoredBox(
+                color: Colors.white,
+                child: ProductImageView(
+                  imagePath: widget.product.image,
+                  productName: widget.product.displayTitle,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),

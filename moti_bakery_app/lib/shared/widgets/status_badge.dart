@@ -29,6 +29,12 @@ class StatusBadge extends StatelessWidget {
           AppColors.statusPreparedBg,
           AppColors.statusPrepared,
         ),
+      OrderStatus.delivered => (
+          'Delivered',
+          Icons.task_alt,
+          AppColors.statusDeliveredBg,
+          AppColors.statusDelivered,
+        ),
     };
 
     return Container(

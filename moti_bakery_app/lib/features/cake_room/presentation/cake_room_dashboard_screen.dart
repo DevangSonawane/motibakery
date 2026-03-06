@@ -48,7 +48,7 @@ class _CakeRoomDashboardScreenState extends ConsumerState<CakeRoomDashboardScree
   Widget build(BuildContext context) {
     final state = ref.watch(orderControllerProvider);
     final totalActive = (state.valueOrNull ?? const <Order>[])
-        .where((o) => o.status != OrderStatus.prepared)
+        .where((o) => o.status != OrderStatus.prepared && o.status != OrderStatus.delivered)
         .length;
 
     return Scaffold(

@@ -15,9 +15,9 @@ class OrderController extends StateNotifier<AsyncValue<List<Order>>> {
     state = await AsyncValue.guard(_service.fetchQueue);
   }
 
-  Future<void> loadMyOrders(String userId) async {
+  Future<void> loadMyOrders(String userId, {bool last15Only = true}) async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _service.fetchMyOrders(userId));
+    state = await AsyncValue.guard(() => _service.fetchMyOrders(userId, last15Only: last15Only));
   }
 
   Future<Order> placeOrder(Order order) async {
@@ -51,6 +51,9 @@ final ordersByStatusProvider = Provider.family<List<Order>, OrderStatus>((ref, s
       list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       break;
     case OrderStatus.prepared:
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      break;
+    case OrderStatus.delivered:
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       break;
   }

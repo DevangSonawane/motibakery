@@ -37,6 +37,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   late String _selectedFlavour;
   late double _weight;
   DateTime _deliveryDate = DateTime.now();
+  TimeOfDay _deliveryTime = TimeOfDay.now();
   bool _isSubmitting = false;
   XFile? _referenceImage;
 
@@ -66,6 +67,16 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
     );
     if (picked != null) {
       setState(() => _deliveryDate = picked);
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _deliveryTime,
+    );
+    if (picked != null) {
+      setState(() => _deliveryTime = picked);
     }
   }
 
@@ -147,13 +158,22 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 
       final random = Random();
       final now = DateTime.now();
+      final scheduledDate = DateTime(_deliveryDate.year, _deliveryDate.month, _deliveryDate.day);
+      final scheduledTime = DateTime(
+        _deliveryDate.year,
+        _deliveryDate.month,
+        _deliveryDate.day,
+        _deliveryTime.hour,
+        _deliveryTime.minute,
+      );
       final order = Order(
         id: '#ORD-${now.year}-${1000 + random.nextInt(8999)}',
         cakeId: widget.cake.id,
         cakeName: widget.cake.name,
         flavour: _selectedFlavour,
         weight: _weight,
-        deliveryDate: _deliveryDate,
+        deliveryDate: scheduledDate,
+        deliveryTime: scheduledTime,
         customerName: _customerController.text.trim().isEmpty
             ? null
             : _customerController.text.trim(),
@@ -381,6 +401,33 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                       const Icon(Icons.calendar_today_outlined, size: 20),
                       const SizedBox(width: 10),
                       Text(DateFormat('dd MMMM yyyy').format(_deliveryDate)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Delivery Time',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _pickTime,
+                borderRadius: BorderRadius.circular(8),
+                child: Ink(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.borderLight),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time_outlined, size: 20),
+                      const SizedBox(width: 10),
+                      Text(_deliveryTime.format(context)),
                     ],
                   ),
                 ),

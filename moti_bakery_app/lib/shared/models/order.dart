@@ -1,4 +1,4 @@
-enum OrderStatus { newOrder, inProgress, prepared }
+enum OrderStatus { newOrder, inProgress, prepared, delivered }
 
 class Order {
   const Order({

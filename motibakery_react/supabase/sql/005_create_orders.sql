@@ -20,7 +20,7 @@ create table if not exists public.orders (
   base_rate_per_kg numeric(10, 2),
   flavour_increment_per_kg numeric(10, 2) not null default 0,
   total_price numeric(10, 2) not null check (total_price >= 0),
-  status text not null default 'new' check (status in ('new', 'in_progress', 'prepared')),
+  status text not null default 'new' check (status in ('new', 'in_progress', 'prepared', 'delivered')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict
@@ -120,6 +120,32 @@ with check (
     from public.users u
     where u.uid = auth.uid()
       and u.role in ('admin', 'cake_room')
+  )
+);
+
+drop policy if exists orders_update_counter_delivered_own on public.orders;
+create policy orders_update_counter_delivered_own
+on public.orders
+for update
+to authenticated
+using (
+  created_by = auth.uid()
+  and status = 'prepared'
+  and exists (
+    select 1
+    from public.users u
+    where u.uid = auth.uid()
+      and u.role in ('admin', 'counter')
+  )
+)
+with check (
+  created_by = auth.uid()
+  and status = 'delivered'
+  and exists (
+    select 1
+    from public.users u
+    where u.uid = auth.uid()
+      and u.role in ('admin', 'counter')
   )
 );
 

@@ -20,6 +20,12 @@ function normalizeOrderRow(row) {
   };
 }
 
+function toMillis(value) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 export async function listOrdersFromSupabase() {
   const token = requireToken();
   const params = new URLSearchParams({
@@ -29,7 +35,10 @@ export async function listOrdersFromSupabase() {
 
   try {
     const rows = await supabaseRestRequest(`/orders?${params.toString()}`, { accessToken: token });
-    return Array.isArray(rows) ? rows.map(normalizeOrderRow) : [];
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .map(normalizeOrderRow)
+      .sort((a, b) => toMillis(b.createdAt || b.created_at) - toMillis(a.createdAt || a.created_at));
   } catch (error) {
     const message = String(error?.message || '').toLowerCase();
     if (message.includes('jwt') || message.includes('invalid')) {
@@ -46,6 +55,30 @@ export async function listOrdersFromSupabase() {
       return [];
     }
 
+    throw error;
+  }
+}
+
+export async function deleteOrderInSupabase({ id, orderId } = {}) {
+  const token = requireToken();
+  if (!id && !orderId) {
+    throw new Error('Order id is required for delete.');
+  }
+
+  const filter = id ? `uid=eq.${id}` : `order_id=eq.${orderId}`;
+
+  try {
+    await supabaseRestRequest(`/orders?${filter}`, {
+      method: 'DELETE',
+      accessToken: token,
+    });
+    return { success: true };
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (message.includes('jwt') || message.includes('invalid')) {
+      useAuthStore.getState().clearAuth();
+      throw new Error('Session expired or invalid. Please sign in again.');
+    }
     throw error;
   }
 }
