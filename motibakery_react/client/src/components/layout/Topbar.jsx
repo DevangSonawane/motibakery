@@ -1,13 +1,22 @@
-import { Bell, Search } from 'lucide-react';
+import { Bell, Menu, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import appLogo from '@/assets/images-3.png';
 
-export function Topbar() {
+export function Topbar({ onMenuClick = () => {} }) {
   const user = useAuthStore((state) => state.user);
 
   return (
-    <header className="fixed left-60 right-0 top-0 z-10 flex h-14 items-center border-b border-gray-200 bg-white px-8">
-      <div className="relative w-full max-w-md">
+    <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-gray-200 bg-white px-3 sm:px-4 md:left-60 lg:px-8">
+      <button
+        type="button"
+        className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 md:hidden"
+        onClick={() => onMenuClick()}
+        aria-label="Open menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      <div className="relative hidden w-full max-w-md sm:block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -16,12 +25,12 @@ export function Topbar() {
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-4">
-        <img src={appLogo} alt="Motibakery logo" className="h-10 w-auto object-contain" />
+      <div className="ml-auto flex items-center gap-2 sm:gap-4">
+        <img src={appLogo} alt="Motibakery logo" className="hidden h-9 w-auto object-contain sm:block" />
         <button type="button" className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800">
           <Bell className="h-5 w-5" />
         </button>
-        <div className="text-sm font-medium text-gray-700">{user?.name || 'Admin User'}</div>
+        <div className="max-w-[140px] truncate text-xs font-medium text-gray-700 sm:text-sm">{user?.name || 'Admin User'}</div>
       </div>
     </header>
   );
