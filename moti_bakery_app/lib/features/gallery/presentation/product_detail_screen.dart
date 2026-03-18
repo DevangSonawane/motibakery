@@ -10,203 +10,303 @@ import '../../../shared/config/supabase_config.dart';
 import '../../../shared/models/product.dart';
 import '../../orders/presentation/product_place_order_screen.dart';
 
-class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key, required this.product});
+class ProductDetailArgs {
+  const ProductDetailArgs({required this.products, required this.initialIndex});
 
-  final Product product;
+  final List<Product> products;
+  final int initialIndex;
+}
+
+class ProductDetailScreen extends StatefulWidget {
+  const ProductDetailScreen({
+    super.key,
+    required this.products,
+    this.initialIndex = 0,
+  });
+
+  factory ProductDetailScreen.single({Key? key, required Product product}) {
+    return ProductDetailScreen(key: key, products: [product], initialIndex: 0);
+  }
+
+  final List<Product> products;
+  final int initialIndex;
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  late final List<String> _variants;
+  late int _index;
+  late List<String> _variants;
   String? _selectedVariant;
 
   @override
   void initState() {
     super.initState();
-    _variants = widget.product.optionValues;
+    if (widget.products.isEmpty) {
+      _index = 0;
+      _variants = const [];
+      _selectedVariant = null;
+      return;
+    }
+    final maxIndex = widget.products.isEmpty ? 0 : widget.products.length - 1;
+    _index = widget.initialIndex.clamp(0, maxIndex);
+    _syncForProduct();
+  }
+
+  Product get _product => widget.products[_index];
+
+  void _syncForProduct() {
+    _variants = _product.optionValues;
     _selectedVariant = _variants.isNotEmpty ? _variants.first : null;
+  }
+
+  void _setProductIndex(int nextIndex) {
+    if (nextIndex == _index) return;
+    if (nextIndex < 0 || nextIndex >= widget.products.length) return;
+    setState(() {
+      _index = nextIndex;
+      _syncForProduct();
+    });
+  }
+
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    final dx = details.velocity.pixelsPerSecond.dx;
+    if (dx.abs() < 320) return;
+
+    if (dx < 0) {
+      _setProductIndex(_index + 1);
+      return;
+    }
+
+    _setProductIndex(_index - 1);
+  }
+
+  void _openImagePreview() {
+    final imagePath = _product.image.trim();
+    if (imagePath.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(_product.displayTitle),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 4,
+              child: ProductImageView(
+                imagePath: _product.image,
+                productName: _product.displayTitle,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.products.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Product Details')),
+        body: Center(
+          child: Text(
+            'No product found',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ),
+      );
+    }
+
+    final product = _product;
     final selectedVariant = _selectedVariant;
     final selectedPrice = selectedVariant == null
-        ? _fallbackPrice(widget.product.rate)
-        : _priceForVariant(widget.product.rate, selectedVariant);
+        ? _fallbackPrice(product.rate)
+        : _priceForVariant(product.rate, selectedVariant);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Product Details')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: SizedBox(
-              height: 320,
-              child: ColoredBox(
-                color: Colors.white,
-                child: ProductImageView(
-                  imagePath: widget.product.image,
-                  productName: widget.product.displayTitle,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            widget.product.displayTitle,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _InfoChip(
-                label: widget.product.category.trim().isEmpty
-                    ? 'Product'
-                    : widget.product.category,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.18),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            ),
-            child: Text(
-              key: ValueKey<String>('price_${selectedVariant ?? 'base'}'),
-              selectedPrice,
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text('Select Variant', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 10),
-          if (_variants.isEmpty)
-            Text(
-              'No variants available',
-              style: Theme.of(context).textTheme.bodyMedium,
-            )
-          else if (_variants.length == 1)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.primaryPale,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: AppColors.primaryLight.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  child: Text(
-                    _variants.first,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
+      appBar: AppBar(
+        title: Text(product.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      body: GestureDetector(
+        onHorizontalDragEnd: _handleHorizontalDragEnd,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: 320,
+                child: Material(
+                  color: Colors.white,
+                  child: InkWell(
+                    onTap: _openImagePreview,
+                    child: ProductImageView(
+                      imagePath: product.image,
+                      productName: product.displayTitle,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),
               ),
-            )
-          else
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 320),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0.96, end: 1),
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, scale, child) {
-                    return Transform.scale(scale: scale, child: child);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.primary.withValues(alpha: 0.18),
-                          AppColors.primaryLight.withValues(alpha: 0.1),
-                        ],
+            ),
+            const SizedBox(height: 18),
+            Text(
+              product.displayTitle,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _InfoChip(
+                  label: product.category.trim().isEmpty ? 'Product' : product.category,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.18),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: Text(
+                key: ValueKey<String>('price_${selectedVariant ?? 'base'}_${product.id}'),
+                selectedPrice,
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Select Variant', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 10),
+            if (_variants.isEmpty)
+              Text(
+                'No variants available',
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else if (_variants.length == 1)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryPale,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primaryLight.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Text(
+                      _variants.first,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedVariant,
-                      isExpanded: true,
-                      borderRadius: BorderRadius.circular(14),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                      decoration: InputDecoration(
-                        labelText: 'Variant',
-                        isDense: true,
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
+                  ),
+                ),
+              )
+            else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.96, end: 1),
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, scale, child) {
+                      return Transform.scale(scale: scale, child: child);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primary.withValues(alpha: 0.18),
+                            AppColors.primaryLight.withValues(alpha: 0.1),
+                          ],
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: AppColors.primary,
-                            width: 1.5,
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedVariant,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(14),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                        decoration: InputDecoration(
+                          labelText: 'Variant',
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
                           ),
                         ),
-                      ),
-                      items: _variants
-                          .map(
-                            (variant) => DropdownMenuItem<String>(
-                              value: variant,
-                              child: Text(
-                                variant,
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                        items: _variants
+                            .map(
+                              (variant) => DropdownMenuItem<String>(
+                                value: variant,
+                                child: Text(
+                                  variant,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedVariant = value);
-                        }
-                      },
+                            )
+                            .toList(growable: false),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _selectedVariant = value);
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -217,7 +317,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               onPressed: () => context.push(
                 '/product-order',
                 extra: ProductOrderArgs(
-                  product: widget.product,
+                  product: product,
                   initialVariant: _selectedVariant,
                 ),
               ),

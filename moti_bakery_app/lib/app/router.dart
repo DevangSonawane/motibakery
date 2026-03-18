@@ -71,8 +71,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/product-detail',
-        builder: (context, state) =>
-            ProductDetailScreen(product: state.extra! as Product),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is ProductDetailArgs) {
+            return ProductDetailScreen(
+              products: extra.products,
+              initialIndex: extra.initialIndex,
+            );
+          }
+          return ProductDetailScreen.single(product: extra! as Product);
+        },
       ),
       GoRoute(
         path: '/product-order',

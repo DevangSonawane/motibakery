@@ -17,6 +17,7 @@ const EMPTY_FORM = {
   variant2: '',
   variant3: '',
   flavours: '1',
+  flavourItems: [{ name: '', price: '' }],
   option1Name: 'Title',
   option1Value: 'Default Title',
   option2Name: '',
@@ -63,6 +64,28 @@ const extractWeightVariants = (weightValue) =>
     .map((part) => normalizeText(part))
     .filter(Boolean)
     .slice(0, 3);
+
+const safeJsonParse = (value) => {
+  try {
+    return JSON.parse(String(value));
+  } catch {
+    return null;
+  }
+};
+
+const normalizeFlavourItems = (items) => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({ name: normalizeText(item?.name), price: normalizeText(item?.price) }));
+};
+
+const parseFlavourItems = (product) => {
+  const parsed = safeJsonParse(product?.option2Value);
+  const parsedItems = normalizeFlavourItems(parsed).filter((item) => item.name || item.price);
+  if (parsedItems.length) return parsedItems;
+
+  const fallbackCount = Math.max(1, Number(product?.flavours || 1) || 1);
+  return Array.from({ length: fallbackCount }, () => ({ name: '', price: '' }));
+};
 
 function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelectAll, isSelected, isAllVisibleSelected) {
   return [
@@ -130,6 +153,25 @@ function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelec
 }
 
 function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isSaving, mode = 'create', categories = [] }) {
+  const isEditMode = mode === 'edit';
+  const flavourItems = Array.isArray(form.flavourItems) ? form.flavourItems : [{ name: '', price: '' }];
+
+  const addFlavourRow = () => {
+    onChange('flavourItems', [...flavourItems, { name: '', price: '' }]);
+  };
+
+  const updateFlavourRow = (index, key, value) => {
+    onChange(
+      'flavourItems',
+      flavourItems.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item))
+    );
+  };
+
+  const removeFlavourRow = (index) => {
+    const next = flavourItems.filter((_, itemIndex) => itemIndex !== index);
+    onChange('flavourItems', next.length ? next : [{ name: '', price: '' }]);
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/30 p-3 sm:p-4">
       <div className="mx-auto my-3 w-full max-w-2xl rounded-xl bg-white p-4 shadow-modal sm:my-6 sm:p-6">
@@ -158,16 +200,18 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
               placeholder="Display title"
             />
           </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Name</span>
-            <input
-              required
-              value={form.name}
-              onChange={(event) => onChange('name', event.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 px-3"
-              placeholder="Product name"
-            />
-          </label>
+          {isEditMode ? null : (
+            <label className="space-y-1 text-sm text-gray-700">
+              <span>Name</span>
+              <input
+                required
+                value={form.name}
+                onChange={(event) => onChange('name', event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3"
+                placeholder="Product name"
+              />
+            </label>
+          )}
           <label className="space-y-1 text-sm text-gray-700">
             <span>Category</span>
             <select
@@ -221,40 +265,110 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
               </select>
             </div>
           </div>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Flavours</span>
-            <input
-              type="number"
-              min="1"
-              value={form.flavours}
-              onChange={(event) => onChange('flavours', event.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 px-3"
-            />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Option1 Name</span>
-            <input value={form.option1Name} onChange={(event) => onChange('option1Name', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Option1 Value</span>
-            <input value={form.option1Value} onChange={(event) => onChange('option1Value', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Option2 Name</span>
-            <input value={form.option2Name} onChange={(event) => onChange('option2Name', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Option2 Value</span>
-            <input value={form.option2Value} onChange={(event) => onChange('option2Value', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Option3 Name</span>
-            <input value={form.option3Name} onChange={(event) => onChange('option3Name', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Option3 Value</span>
-            <input value={form.option3Value} onChange={(event) => onChange('option3Value', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
+          {isEditMode ? (
+            <div className="space-y-2 text-sm text-gray-700 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <span>Flavours</span>
+                <button
+                  type="button"
+                  onClick={addFlavourRow}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  + Add
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {flavourItems.map((item, index) => (
+                  <div key={`flavour-${index}`} className="flex items-center gap-2 rounded-md border border-gray-300 bg-white p-2">
+                    <input
+                      value={item.name}
+                      onChange={(event) => updateFlavourRow(index, 'name', event.target.value)}
+                      className="h-9 w-44 rounded-md border border-gray-200 px-2 text-sm"
+                      placeholder="Flavour name"
+                    />
+                    <input
+                      type="number"
+                      value={item.price}
+                      onChange={(event) => updateFlavourRow(index, 'price', event.target.value)}
+                      className="h-9 w-28 rounded-md border border-gray-200 px-2 text-sm"
+                      placeholder="Price"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeFlavourRow(index)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                      aria-label="Remove flavour"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <label className="space-y-1 text-sm text-gray-700">
+              <span>Flavours</span>
+              <input
+                type="number"
+                min="1"
+                value={form.flavours}
+                onChange={(event) => onChange('flavours', event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3"
+              />
+            </label>
+          )}
+          {isEditMode ? null : (
+            <>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Option1 Name</span>
+                <input
+                  value={form.option1Name}
+                  onChange={(event) => onChange('option1Name', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Option1 Value</span>
+                <input
+                  value={form.option1Value}
+                  onChange={(event) => onChange('option1Value', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Option2 Name</span>
+                <input
+                  value={form.option2Name}
+                  onChange={(event) => onChange('option2Name', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Option2 Value</span>
+                <input
+                  value={form.option2Value}
+                  onChange={(event) => onChange('option2Value', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Option3 Name</span>
+                <input
+                  value={form.option3Name}
+                  onChange={(event) => onChange('option3Name', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Option3 Value</span>
+                <input
+                  value={form.option3Value}
+                  onChange={(event) => onChange('option3Value', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+            </>
+          )}
           <label className="space-y-1 text-sm text-gray-700">
             <span>SKU</span>
             <input value={form.sku} onChange={(event) => onChange('sku', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
@@ -263,43 +377,90 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
             <span>HS Code</span>
             <input value={form.hsCode} onChange={(event) => onChange('hsCode', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
           </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>COO</span>
-            <input value={form.coo} onChange={(event) => onChange('coo', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" placeholder="Country of origin" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Location</span>
-            <input value={form.location} onChange={(event) => onChange('location', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Bin Name</span>
-            <input value={form.binName} onChange={(event) => onChange('binName', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <div />
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Incoming</span>
-            <input type="number" value={form.incoming} onChange={(event) => onChange('incoming', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Unavailable</span>
-            <input type="number" value={form.unavailable} onChange={(event) => onChange('unavailable', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Committed</span>
-            <input type="number" value={form.committed} onChange={(event) => onChange('committed', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Available</span>
-            <input type="number" value={form.available} onChange={(event) => onChange('available', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>On Hand (Current)</span>
-            <input type="number" value={form.onHandCurrent} onChange={(event) => onChange('onHandCurrent', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>On Hand (New)</span>
-            <input type="number" value={form.onHandNew} onChange={(event) => onChange('onHandNew', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
+          {isEditMode ? null : (
+            <>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>COO</span>
+                <input
+                  value={form.coo}
+                  onChange={(event) => onChange('coo', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                  placeholder="Country of origin"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Location</span>
+                <input
+                  value={form.location}
+                  onChange={(event) => onChange('location', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Bin Name</span>
+                <input
+                  value={form.binName}
+                  onChange={(event) => onChange('binName', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <div />
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Incoming</span>
+                <input
+                  type="number"
+                  value={form.incoming}
+                  onChange={(event) => onChange('incoming', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Unavailable</span>
+                <input
+                  type="number"
+                  value={form.unavailable}
+                  onChange={(event) => onChange('unavailable', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Committed</span>
+                <input
+                  type="number"
+                  value={form.committed}
+                  onChange={(event) => onChange('committed', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>Available</span>
+                <input
+                  type="number"
+                  value={form.available}
+                  onChange={(event) => onChange('available', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>On Hand (Current)</span>
+                <input
+                  type="number"
+                  value={form.onHandCurrent}
+                  onChange={(event) => onChange('onHandCurrent', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-gray-700">
+                <span>On Hand (New)</span>
+                <input
+                  type="number"
+                  value={form.onHandNew}
+                  onChange={(event) => onChange('onHandNew', event.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3"
+                />
+              </label>
+            </>
+          )}
           <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
             <span>Image URL (optional)</span>
             <input
@@ -348,6 +509,7 @@ function toFormState(product) {
     variant2,
     variant3,
     flavours: String(product.flavours || 1),
+    flavourItems: parseFlavourItems(product),
     option1Name: product.option1Name || 'Title',
     option1Value: product.option1Value || 'Default Title',
     option2Name: product.option2Name || '',
@@ -473,6 +635,12 @@ export function ProductsPage() {
       new Set([form.variant1, form.variant2, form.variant3].map((variant) => normalizeText(variant)).filter(Boolean))
     );
 
+    const flavourItemsToPersist = normalizeFlavourItems(form.flavourItems).filter((item) => item.name || item.price);
+    const flavoursCount = Math.max(
+      1,
+      flavourItemsToPersist.length || selectedVariants.length || Number(form.flavours) || 1
+    );
+
     const payload = {
       handle: normalizeText(form.handle) || slugify(form.name || form.title),
       title: normalizeText(form.title) || normalizeText(form.name),
@@ -480,13 +648,13 @@ export function ProductsPage() {
       category: normalizeText(form.category) || 'General',
       rate: normalizeText(form.rate) || '-',
       weight: selectedVariants.length ? selectedVariants.join(', ') : '-',
-      flavours: selectedVariants.length || Number(form.flavours) || 1,
+      flavours: flavoursCount,
       status: editingProduct?.status || 'active',
       image: normalizeText(form.imageUrl),
       option1Name: normalizeText(form.option1Name) || 'Weight',
       option1Value: selectedVariants.length ? selectedVariants.join(', ') : normalizeText(form.option1Value) || 'Default Title',
-      option2Name: normalizeText(form.option2Name),
-      option2Value: normalizeText(form.option2Value),
+      option2Name: flavourItemsToPersist.length ? 'flavours' : normalizeText(form.option2Name),
+      option2Value: flavourItemsToPersist.length ? JSON.stringify(flavourItemsToPersist) : normalizeText(form.option2Value),
       option3Name: normalizeText(form.option3Name),
       option3Value: normalizeText(form.option3Value),
       sku: normalizeText(form.sku),

@@ -147,7 +147,11 @@ class CounterHomeScreen extends ConsumerWidget {
                       ),
                       itemBuilder: (context, index) {
                         final product = filteredProducts[index];
-                        return _InventoryCard(product: product, index: index);
+                        return _InventoryCard(
+                          product: product,
+                          products: filteredProducts,
+                          index: index,
+                        );
                       },
                     );
                   },
@@ -240,9 +244,14 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _InventoryCard extends StatelessWidget {
-  const _InventoryCard({required this.product, required this.index});
+  const _InventoryCard({
+    required this.product,
+    required this.products,
+    required this.index,
+  });
 
   final Product product;
+  final List<Product> products;
   final int index;
 
   @override
@@ -253,7 +262,10 @@ class _InventoryCard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: () => context.push('/product-detail', extra: product),
+            onTap: () => context.push(
+              '/product-detail',
+              extra: ProductDetailArgs(products: products, initialIndex: index),
+            ),
               child: Ink(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
