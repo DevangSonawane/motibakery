@@ -13,19 +13,16 @@ const EMPTY_FORM = {
   category: '',
   rate: '',
   weight: '',
-  variant1: '',
-  variant2: '',
-  variant3: '',
+  minWeight: '',
+  maxWeight: '',
   flavours: '1',
-  flavourItems: [{ name: '', price: '' }],
+  flavourItems: [{ name: '', price: '', customName: '' }],
   option1Name: 'Title',
   option1Value: 'Default Title',
   option2Name: '',
   option2Value: '',
   option3Name: '',
   option3Value: '',
-  sku: '',
-  hsCode: '',
   coo: '',
   location: 'Moti bakery',
   binName: '',
@@ -38,17 +35,7 @@ const EMPTY_FORM = {
   imageUrl: '',
 };
 
-const SWIGGY_CATEGORIES = [
-  'Bread Toast Products',
-  'Khari',
-  'Bread',
-  'Sweets',
-  'Cookies',
-  'Savoury',
-  'Eggless cake',
-];
-
-const WEIGHT_VARIANT_OPTIONS = ['1', '1pcs', '5pcs', '6pcs', '200gms', '250gms', '300gms', '400gms', '500gms', '800gms', '1kg', '1200gms'];
+const FLAVOUR_OPTIONS = ['Chocolate', 'Vanilla', 'Pineapple', 'Butterscotch', 'Strawberry'];
 
 const normalizeText = (value) => String(value || '').trim();
 const slugify = (value) =>
@@ -58,12 +45,6 @@ const slugify = (value) =>
     .replace(/^-+|-+$/g, '');
 
 const formatDisplayIndex = (index) => `#C${String(index).padStart(3, '0')}`;
-const extractWeightVariants = (weightValue) =>
-  normalizeText(weightValue)
-    .split(',')
-    .map((part) => normalizeText(part))
-    .filter(Boolean)
-    .slice(0, 3);
 
 const safeJsonParse = (value) => {
   try {
@@ -75,16 +56,24 @@ const safeJsonParse = (value) => {
 
 const normalizeFlavourItems = (items) => {
   if (!Array.isArray(items)) return [];
-  return items.map((item) => ({ name: normalizeText(item?.name), price: normalizeText(item?.price) }));
+  return items.map((item) => {
+    const selected = normalizeText(item?.name);
+    const customName = normalizeText(item?.customName);
+    return {
+      name: selected === '__custom__' ? customName : selected,
+      price: normalizeText(item?.price),
+      customName,
+    };
+  });
 };
 
 const parseFlavourItems = (product) => {
   const parsed = safeJsonParse(product?.option2Value);
-  const parsedItems = normalizeFlavourItems(parsed).filter((item) => item.name || item.price);
+  const parsedItems = normalizeFlavourItems(parsed).filter((item) => item.name || item.price || item.customName);
   if (parsedItems.length) return parsedItems;
 
   const fallbackCount = Math.max(1, Number(product?.flavours || 1) || 1);
-  return Array.from({ length: fallbackCount }, () => ({ name: '', price: '' }));
+  return Array.from({ length: fallbackCount }, () => ({ name: '', price: '', customName: '' }));
 };
 
 function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelectAll, isSelected, isAllVisibleSelected) {
@@ -122,9 +111,17 @@ function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelec
         ),
     },
     { key: 'name', label: 'Name' },
-    { key: 'category', label: 'Category' },
     { key: 'rate', label: 'Rate' },
-    { key: 'weight', label: 'Weight' },
+    {
+      key: 'minWeight',
+      label: 'Min Weight',
+      render: (row) => (row.minWeight == null ? '-' : row.minWeight),
+    },
+    {
+      key: 'maxWeight',
+      label: 'Max Weight',
+      render: (row) => (row.maxWeight == null ? '-' : row.maxWeight),
+    },
     { key: 'flavours', label: 'Flavours' },
     { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
     {
@@ -152,24 +149,30 @@ function buildColumnsWithActions(onEdit, onDelete, onToggleSelect, onToggleSelec
   ];
 }
 
-function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isSaving, mode = 'create', categories = [] }) {
+function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isSaving, mode = 'create' }) {
   const isEditMode = mode === 'edit';
-  const flavourItems = Array.isArray(form.flavourItems) ? form.flavourItems : [{ name: '', price: '' }];
+  const flavourItems = Array.isArray(form.flavourItems) ? form.flavourItems : [{ name: '', price: '', customName: '' }];
 
   const addFlavourRow = () => {
-    onChange('flavourItems', [...flavourItems, { name: '', price: '' }]);
+    onChange('flavourItems', [...flavourItems, { name: '', price: '', customName: '' }]);
   };
 
   const updateFlavourRow = (index, key, value) => {
     onChange(
       'flavourItems',
-      flavourItems.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item))
+      flavourItems.map((item, itemIndex) => {
+        if (itemIndex !== index) return item;
+        if (key === 'name' && value !== '__custom__') {
+          return { ...item, name: value, customName: '' };
+        }
+        return { ...item, [key]: value };
+      })
     );
   };
 
   const removeFlavourRow = (index) => {
     const next = flavourItems.filter((_, itemIndex) => itemIndex !== index);
-    onChange('flavourItems', next.length ? next : [{ name: '', price: '' }]);
+    onChange('flavourItems', next.length ? next : [{ name: '', price: '', customName: '' }]);
   };
 
   return (
@@ -212,57 +215,27 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
               />
             </label>
           )}
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Category</span>
-            <select
-              value={form.category}
-              onChange={(event) => onChange('category', event.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 px-3"
-            >
-              <option value="">Select category</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>Rate</span>
-            <input
-              value={form.rate}
-              onChange={(event) => onChange('rate', event.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 px-3"
-              placeholder="₹350/kg"
-            />
-          </label>
-          <div className="space-y-1 text-sm text-gray-700">
-            <span>Weight Variants</span>
-            <div className="grid grid-cols-3 gap-2">
-              <select value={form.variant1} onChange={(event) => onChange('variant1', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-2">
-                <option value="">Variant 1</option>
-                {WEIGHT_VARIANT_OPTIONS.map((variant) => (
-                  <option key={`v1-${variant}`} value={variant}>
-                    {variant}
-                  </option>
-                ))}
-              </select>
-              <select value={form.variant2} onChange={(event) => onChange('variant2', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-2">
-                <option value="">Variant 2</option>
-                {WEIGHT_VARIANT_OPTIONS.map((variant) => (
-                  <option key={`v2-${variant}`} value={variant}>
-                    {variant}
-                  </option>
-                ))}
-              </select>
-              <select value={form.variant3} onChange={(event) => onChange('variant3', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-2">
-                <option value="">Variant 3</option>
-                {WEIGHT_VARIANT_OPTIONS.map((variant) => (
-                  <option key={`v3-${variant}`} value={variant}>
-                    {variant}
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-2 text-sm text-gray-700 md:col-span-2">
+            <span>Weight Range (kg)</span>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                value={form.minWeight}
+                onChange={(event) => onChange('minWeight', event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3"
+                placeholder="Min weight"
+                min="0"
+                step="0.1"
+              />
+              <input
+                type="number"
+                value={form.maxWeight}
+                onChange={(event) => onChange('maxWeight', event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3"
+                placeholder="Max weight"
+                min="0"
+                step="0.1"
+              />
             </div>
           </div>
           <div className="space-y-2 text-sm text-gray-700 md:col-span-2">
@@ -279,13 +252,28 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {flavourItems.map((item, index) => (
-                <div key={`flavour-${index}`} className="flex items-center gap-2 rounded-md border border-gray-300 bg-white p-2">
-                  <input
+                <div key={`flavour-${index}`} className="flex flex-wrap items-center gap-2 rounded-md border border-gray-300 bg-white p-2">
+                  <select
                     value={item.name}
                     onChange={(event) => updateFlavourRow(index, 'name', event.target.value)}
                     className="h-9 w-44 rounded-md border border-gray-200 px-2 text-sm"
-                    placeholder="Flavour"
-                  />
+                  >
+                    <option value="">Select flavour</option>
+                    {FLAVOUR_OPTIONS.map((flavour) => (
+                      <option key={`flavour-${flavour}`} value={flavour}>
+                        {flavour}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom</option>
+                  </select>
+                  {item.name === '__custom__' ? (
+                    <input
+                      value={item.customName || ''}
+                      onChange={(event) => updateFlavourRow(index, 'customName', event.target.value)}
+                      className="h-9 w-44 rounded-md border border-gray-200 px-2 text-sm"
+                      placeholder="Custom flavour"
+                    />
+                  ) : null}
                   <input
                     type="number"
                     value={item.price}
@@ -305,23 +293,6 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
               ))}
             </div>
           </div>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>SKU</span>
-            <input value={form.sku} onChange={(event) => onChange('sku', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700">
-            <span>HS Code</span>
-            <input value={form.hsCode} onChange={(event) => onChange('hsCode', event.target.value)} className="h-10 w-full rounded-md border border-gray-300 px-3" />
-          </label>
-          <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
-            <span>Image URL (optional)</span>
-            <input
-              value={form.imageUrl}
-              onChange={(event) => onChange('imageUrl', event.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 px-3"
-              placeholder="https://example.com/product.jpg"
-            />
-          </label>
           <div className="space-y-2 md:col-span-2">
             <span className="text-sm text-gray-700">Image Upload</span>
             <label className="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-600 hover:bg-gray-50">
@@ -349,7 +320,15 @@ function AddProductModal({ form, onChange, onClose, onSubmit, onImageSelect, isS
 }
 
 function toFormState(product) {
-  const [variant1 = '', variant2 = '', variant3 = ''] = extractWeightVariants(product.weight);
+  const rawFlavourItems = parseFlavourItems(product);
+  const mappedFlavourItems = rawFlavourItems.map((item) => {
+    const name = normalizeText(item.name);
+    if (!name) return { ...item, name: '', customName: item.customName || '' };
+    if (FLAVOUR_OPTIONS.includes(name)) {
+      return { ...item, name, customName: '' };
+    }
+    return { ...item, name: '__custom__', customName: name };
+  });
   return {
     handle: product.handle || '',
     title: product.title || product.name || '',
@@ -357,19 +336,16 @@ function toFormState(product) {
     category: product.category || '',
     rate: product.rate || '',
     weight: product.weight || '',
-    variant1,
-    variant2,
-    variant3,
+    minWeight: product.minWeight == null ? '' : String(product.minWeight),
+    maxWeight: product.maxWeight == null ? '' : String(product.maxWeight),
     flavours: String(product.flavours || 1),
-    flavourItems: parseFlavourItems(product),
+    flavourItems: mappedFlavourItems,
     option1Name: product.option1Name || 'Title',
     option1Value: product.option1Value || 'Default Title',
     option2Name: product.option2Name || '',
     option2Value: product.option2Value || '',
     option3Name: product.option3Name || '',
     option3Value: product.option3Value || '',
-    sku: product.sku || '',
-    hsCode: product.hsCode || '',
     coo: product.coo || '',
     location: product.location || 'Moti bakery',
     binName: product.binName || '',
@@ -385,7 +361,6 @@ function toFormState(product) {
 
 export function ProductsPage() {
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -399,25 +374,19 @@ export function ProductsPage() {
   const deleteCake = useDeleteCake();
   const importCakes = useImportCakes();
 
-  const categories = useMemo(() => {
-    const values = Array.from(new Set([...SWIGGY_CATEGORIES, ...products.map((product) => product.category).filter(Boolean)]));
-    return values.sort((a, b) => a.localeCompare(b));
-  }, [products]);
-
   const rows = useMemo(() => {
     const filtered = products.filter((product) => {
       const query = search.trim().toLowerCase();
       const matchesSearch = !query || product.name.toLowerCase().includes(query) || product.handle.toLowerCase().includes(query);
-      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
       const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
-      return matchesSearch && matchesCategory && matchesStatus;
+      return matchesSearch && matchesStatus;
     });
 
     return filtered.map((product, index) => ({
       ...product,
       displayId: formatDisplayIndex(index + 1),
     }));
-  }, [products, search, categoryFilter, statusFilter]);
+  }, [products, search, statusFilter]);
 
   const selectedVisibleCount = useMemo(() => rows.filter((row) => selectedIds.includes(row.id)).length, [rows, selectedIds]);
   const isAllVisibleSelected = rows.length > 0 && selectedVisibleCount === rows.length;
@@ -483,15 +452,15 @@ export function ProductsPage() {
       return;
     }
 
-    const selectedVariants = Array.from(
-      new Set([form.variant1, form.variant2, form.variant3].map((variant) => normalizeText(variant)).filter(Boolean))
-    );
-
-    const flavourItemsToPersist = normalizeFlavourItems(form.flavourItems).filter((item) => item.name || item.price);
-    const flavoursCount = Math.max(
-      1,
-      flavourItemsToPersist.length || selectedVariants.length || Number(form.flavours) || 1
-    );
+    const flavourItemsToPersist = normalizeFlavourItems(form.flavourItems).filter((item) => item.name || item.price || item.customName);
+    const flavoursCount = Math.max(1, flavourItemsToPersist.length || Number(form.flavours) || 1);
+    const weightValue = normalizeText(form.weight);
+    const minWeightValue = normalizeText(form.minWeight);
+    const maxWeightValue = normalizeText(form.maxWeight);
+    const minWeightNumber = minWeightValue === '' ? null : Number(minWeightValue);
+    const maxWeightNumber = maxWeightValue === '' ? null : Number(maxWeightValue);
+    const minWeight = Number.isFinite(minWeightNumber) ? minWeightNumber : null;
+    const maxWeight = Number.isFinite(maxWeightNumber) ? maxWeightNumber : null;
 
     const payload = {
       handle: normalizeText(form.handle) || slugify(form.name || form.title),
@@ -499,18 +468,18 @@ export function ProductsPage() {
       name: normalizeText(form.name),
       category: normalizeText(form.category) || 'General',
       rate: normalizeText(form.rate) || '-',
-      weight: selectedVariants.length ? selectedVariants.join(', ') : '-',
+      weight: weightValue || '-',
+      minWeight,
+      maxWeight,
       flavours: flavoursCount,
       status: editingProduct?.status || 'active',
       image: normalizeText(form.imageUrl),
       option1Name: normalizeText(form.option1Name) || 'Weight',
-      option1Value: selectedVariants.length ? selectedVariants.join(', ') : normalizeText(form.option1Value) || 'Default Title',
+      option1Value: weightValue || normalizeText(form.option1Value) || 'Default Title',
       option2Name: flavourItemsToPersist.length ? 'flavours' : normalizeText(form.option2Name),
       option2Value: flavourItemsToPersist.length ? JSON.stringify(flavourItemsToPersist) : normalizeText(form.option2Value),
       option3Name: normalizeText(form.option3Name),
       option3Value: normalizeText(form.option3Value),
-      sku: normalizeText(form.sku),
-      hsCode: normalizeText(form.hsCode),
       coo: normalizeText(form.coo),
       location: normalizeText(form.location) || 'Moti bakery',
       binName: normalizeText(form.binName),
@@ -558,8 +527,6 @@ export function ProductsPage() {
           option1Name: normalizeText(row['Option1 Name']) || 'Title',
           option2Name: normalizeText(row['Option2 Name']),
           option3Name: normalizeText(row['Option3 Name']),
-          sku: normalizeText(row.SKU),
-          hsCode: normalizeText(row['HS Code']),
           coo: normalizeText(row.COO),
           location: normalizeText(row.Location) || 'Moti bakery',
           binName: normalizeText(row['Bin name']),
@@ -580,8 +547,6 @@ export function ProductsPage() {
       item.status = item.stock > 0 ? 'active' : 'inactive';
       if (!item.option2Name) item.option2Name = normalizeText(row['Option2 Name']);
       if (!item.option3Name) item.option3Name = normalizeText(row['Option3 Name']);
-      if (!item.sku) item.sku = normalizeText(row.SKU);
-      if (!item.hsCode) item.hsCode = normalizeText(row['HS Code']);
       if (!item.coo) item.coo = normalizeText(row.COO);
       if (!item.binName) item.binName = normalizeText(row['Bin name']);
     });
@@ -602,8 +567,6 @@ export function ProductsPage() {
       option2Value: '',
       option3Name: item.option3Name || '',
       option3Value: '',
-      sku: item.sku || '',
-      hsCode: item.hsCode || '',
       coo: item.coo || '',
       location: item.location || 'Moti bakery',
       binName: item.binName || '',
@@ -692,14 +655,6 @@ export function ProductsPage() {
           className="h-10 min-w-[220px] rounded-md border border-gray-300 px-3 text-sm"
           placeholder="Search products..."
         />
-        <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 rounded-md border border-gray-300 px-3 text-sm">
-          <option value="all">All Categories</option>
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border border-gray-300 px-3 text-sm">
           <option value="all">All Status</option>
           <option value="active">Active</option>
@@ -724,7 +679,6 @@ export function ProductsPage() {
       {isModalOpen ? (
         <AddProductModal
           form={form}
-          categories={categories}
           onChange={updateForm}
           onClose={() => {
             resetForm();
