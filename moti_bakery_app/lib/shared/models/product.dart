@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Product {
   const Product({
     required this.id,
@@ -113,9 +115,38 @@ class Product {
 
   List<String> get optionValues {
     final values = <String>{};
+    final option2Label = option2Name?.trim().toLowerCase();
+    if (option2Label == 'flavours' || option2Label == 'flavors') {
+      final raw = option2Value?.trim() ?? '';
+      if (raw.isEmpty) return const [];
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) return const [];
+        final options = <String>[];
+        for (final item in decoded) {
+          if (item is! Map) continue;
+          final name = item['name']?.toString() ?? '';
+          final customName = item['customName']?.toString() ?? '';
+          final picked = name == '__custom__' ? customName : name;
+          final trimmed = picked.trim();
+          if (trimmed.isNotEmpty) {
+            options.add(trimmed);
+          }
+        }
+        return options;
+      } catch (_) {
+        return const [];
+      }
+    }
+
     void addRaw(String? raw) {
       final normalized = raw?.trim() ?? '';
       if (normalized.isEmpty) {
+        return;
+      }
+      final parsed = _tryParseOptionValues(normalized);
+      if (parsed.isNotEmpty) {
+        values.addAll(parsed);
         return;
       }
       for (final part in normalized.split(',')) {
@@ -130,6 +161,91 @@ class Product {
     addRaw(option2Value);
     addRaw(option3Value);
     return values.toList(growable: false);
+  }
+
+  static List<String> _tryParseOptionValues(String raw) {
+    if (!(raw.startsWith('{') || raw.startsWith('['))) {
+      return const [];
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      return _extractFromJson(decoded);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static List<String> _extractFromJson(dynamic data) {
+    final results = <String>[];
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map) {
+          final name = item['name']?.toString() ?? '';
+          final customName = item['customName']?.toString() ?? '';
+          final picked = name == '__custom__' ? customName : name;
+          final trimmed = picked.trim();
+          if (trimmed.isNotEmpty) {
+            results.add(trimmed);
+          }
+          continue;
+        }
+        final value = _extractValue(item);
+        if (value != null && value.trim().isNotEmpty) {
+          results.add(value.trim());
+        }
+      }
+      return results;
+    }
+    if (data is Map) {
+      final listValue = _findListInMap(data);
+      if (listValue != null) {
+        return _extractFromJson(listValue);
+      }
+      final value = _labelFromMap(data);
+      if (value != null && value.trim().isNotEmpty) {
+        results.add(value.trim());
+      }
+      return results;
+    }
+    if (data is String && data.trim().isNotEmpty) {
+      results.add(data.trim());
+    }
+    return results;
+  }
+
+  static dynamic _findListInMap(Map<dynamic, dynamic> map) {
+    const keys = [
+      'values',
+      'options',
+      'variants',
+      'flavours',
+      'flavors',
+      'items',
+      'data',
+    ];
+    for (final key in keys) {
+      if (map.containsKey(key) && map[key] is List) {
+        return map[key];
+      }
+    }
+    return null;
+  }
+
+  static String? _extractValue(dynamic item) {
+    if (item is String) return item;
+    if (item is Map) return _labelFromMap(item);
+    return null;
+  }
+
+  static String? _labelFromMap(Map<dynamic, dynamic> map) {
+    const keys = ['flavour', 'flavor', 'name', 'label', 'title', 'value'];
+    for (final key in keys) {
+      final value = map[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
   }
 
   static String _string(dynamic value) {

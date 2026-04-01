@@ -129,7 +129,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final selectedVariant = _selectedVariant;
     final selectedPrice = selectedVariant == null
         ? _fallbackPrice(product.rate)
-        : _priceForVariant(product.rate, selectedVariant);
+        : _priceForVariant(product, selectedVariant);
 
     return Scaffold(
       appBar: AppBar(
@@ -221,7 +221,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       vertical: 10,
                     ),
                     child: Text(
-                      _variants.first,
+                      _variantLabel(_variants.first, product),
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
@@ -288,7 +288,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               (variant) => DropdownMenuItem<String>(
                                 value: variant,
                                 child: Text(
-                                  variant,
+                                  _variantLabel(variant, product),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
                                 ),
@@ -337,31 +337,115 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   String _fallbackPrice(String rate) {
-    final cleanRate = rate.trim();
-    if (cleanRate.isEmpty || cleanRate == '-') return 'Price on request';
-    return cleanRate.startsWith('₹') ? cleanRate : '₹$cleanRate';
+    return _normalizePrice(rate);
   }
 
-  String _priceForVariant(String rate, String variant) {
-    final normalizedRate = rate.trim();
+  String _priceForVariant(Product product, String variant) {
+    final normalizedRate = product.rate.trim();
     if (normalizedRate.isEmpty || normalizedRate == '-') {
       return 'Price on request';
     }
 
     final segments = normalizedRate.split('|');
+    var matched = false;
     for (final segment in segments) {
-      final parts = segment.split(':');
-      if (parts.length < 2) {
-        continue;
-      }
-      final key = parts.first.trim().toLowerCase();
-      final value = parts.sublist(1).join(':').trim();
-      if (key == variant.toLowerCase() && value.isNotEmpty) {
-        return value.startsWith('₹') ? value : '₹$value';
+      final parts = _splitKeyValue(segment);
+      if (parts == null) continue;
+      final key = _normalizeVariant(parts.$1);
+      final value = parts.$2.trim();
+      if (key.isEmpty || value.isEmpty) continue;
+      if (key == _normalizeVariant(variant)) {
+        matched = true;
+        return _normalizePrice(value);
       }
     }
 
-    return _fallbackPrice(rate);
+    if (!matched) {
+      final optionPrice = _priceFromOption2Json(product.option2Value, variant);
+      if (optionPrice != null) {
+        return '₹$optionPrice';
+      }
+    }
+
+    return _fallbackPrice(product.rate);
+  }
+
+  String _normalizePrice(String raw) {
+    final clean = raw.trim();
+    if (clean.isEmpty || clean == '-') return 'Price on request';
+
+    final hasCurrency = clean.contains('₹');
+    final lower = clean.toLowerCase();
+    final fromRegex = RegExp(r'^\s*from\s+', caseSensitive: false);
+    if (hasCurrency) {
+      return clean.replaceFirst(fromRegex, '');
+    }
+    final withoutFrom = clean.replaceFirst(fromRegex, '');
+    return '₹$withoutFrom';
+  }
+
+  (String, String)? _splitKeyValue(String segment) {
+    final trimmed = segment.trim();
+    if (trimmed.isEmpty) return null;
+
+    int index = trimmed.indexOf(':');
+    String delimiter = ':';
+    if (index == -1) {
+      index = trimmed.indexOf('=');
+      delimiter = '=';
+    }
+    if (index == -1) {
+      index = trimmed.indexOf(' - ');
+      delimiter = ' - ';
+    }
+    if (index == -1) return null;
+    final key = trimmed.substring(0, index).trim();
+    final value = trimmed.substring(index + delimiter.length).trim();
+    return (key, value);
+  }
+
+  String _normalizeVariant(String raw) {
+    final lower = raw.toLowerCase();
+    final buffer = StringBuffer();
+    for (final codeUnit in lower.codeUnits) {
+      final isDigit = codeUnit >= 48 && codeUnit <= 57;
+      final isLower = codeUnit >= 97 && codeUnit <= 122;
+      if (isDigit || isLower) {
+        buffer.writeCharCode(codeUnit);
+      }
+    }
+    return buffer.toString();
+  }
+
+  String _variantLabel(String variant, Product product) {
+    final trimmed = variant.trim();
+    if (trimmed.isEmpty) return product.displayTitle;
+    return trimmed;
+  }
+
+  String? _priceFromOption2Json(String? raw, String variant) {
+    final normalizedVariant = _normalizeVariant(variant);
+    if (normalizedVariant.isEmpty) return null;
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty || !(value.startsWith('[') || value.startsWith('{'))) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! List) return null;
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final name = item['name']?.toString() ?? '';
+        if (_normalizeVariant(name) != normalizedVariant) continue;
+        final price = item['price']?.toString() ?? '';
+        final trimmed = price.trim();
+        if (trimmed.isEmpty) continue;
+        return trimmed;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 }
 
