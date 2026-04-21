@@ -19,6 +19,23 @@ function handleSupabaseAuthError(error) {
   throw error;
 }
 
+const toFiniteNumberOrNull = (value) => {
+  if (value == null) return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const safeParseJsonArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 function normalizeProductRow(row) {
   return {
     id: row.id,
@@ -26,8 +43,8 @@ function normalizeProductRow(row) {
     title: row.title || row.name || '',
     name: row.name,
     category: row.category || 'General',
-    rate: row.rate || '-',
-    weight: row.weight || '-',
+    rate: toFiniteNumberOrNull(row.rate),
+    weight: toFiniteNumberOrNull(row.weight),
     minWeight: row.min_weight == null ? null : Number(row.min_weight),
     maxWeight: row.max_weight == null ? null : Number(row.max_weight),
     flavours: String(row.flavours || 1),
@@ -36,7 +53,7 @@ function normalizeProductRow(row) {
     option1Name: row.option1_name || '',
     option1Value: row.option1_value || '',
     option2Name: row.option2_name || '',
-    option2Value: row.option2_value || '',
+    option2Value: safeParseJsonArray(row.option2_value),
     option3Name: row.option3_name || '',
     option3Value: row.option3_value || '',
     coo: row.coo || '',
@@ -258,6 +275,122 @@ export async function upsertImportedProductsInSupabase(products = []) {
     }
 
     return { inserted: inserts.length, updated: updates.length };
+  } catch (error) {
+    handleSupabaseAuthError(error);
+  }
+}
+
+const roundTo2dpString = (value) => Number(value).toFixed(2);
+
+export async function bulkUpdateProductsInSupabase(bulkSpec) {
+  const token = requireToken();
+  const params = new URLSearchParams({ select: 'id,rate,option2_value' });
+
+  const type = bulkSpec?.type;
+  const flavourUpdates = Array.isArray(bulkSpec?.flavourUpdates) ? bulkSpec.flavourUpdates : [];
+  const priceUpdate = bulkSpec?.priceUpdate || {};
+
+  try {
+    const rows = await supabaseRestRequest(`/products?${params.toString()}`, { accessToken: token });
+    const products = Array.isArray(rows) ? rows : [];
+
+    const patches = [];
+    const getOption2Array = (raw) => safeParseJsonArray(raw);
+    const buildOption2PatchValue = (raw, nextItems) => (Array.isArray(raw) ? nextItems : JSON.stringify(nextItems));
+
+    if (type === 'flavour') {
+      products.forEach((product) => {
+        const rawOption2 = product?.option2_value;
+        const parsed = getOption2Array(rawOption2);
+        if (!parsed?.length) return;
+
+        let changed = false;
+        const nextItems = parsed.map((item) => ({ ...item }));
+
+        flavourUpdates.forEach((update) => {
+          const targetFlavour = String(update?.flavour || '');
+          if (!targetFlavour) return;
+
+          const increaseBy = Number(update?.increaseBy || 0);
+          const decreaseBy = Number(update?.decreaseBy || 0);
+          const delta = (Number.isFinite(increaseBy) ? increaseBy : 0) - (Number.isFinite(decreaseBy) ? decreaseBy : 0);
+          if (delta === 0) return;
+
+          nextItems.forEach((item) => {
+            if (item?.name !== targetFlavour) return;
+            const currentPrice = Number.parseFloat(String(item?.price ?? '').trim());
+            if (!Number.isFinite(currentPrice)) return;
+
+            const updatedPrice = Math.max(0, currentPrice + delta);
+            item.price = roundTo2dpString(updatedPrice);
+            changed = true;
+          });
+        });
+
+        if (!changed) return;
+
+        patches.push(
+          supabaseRestRequest(`/products?id=eq.${product.id}`, {
+            method: 'PATCH',
+            body: { option2_value: buildOption2PatchValue(rawOption2, nextItems) },
+            accessToken: token,
+          })
+        );
+      });
+    }
+
+    if (type === 'price') {
+      const amount = typeof priceUpdate?.amount === 'number' && Number.isFinite(priceUpdate.amount) ? priceUpdate.amount : null;
+      const increaseBy = Number(priceUpdate?.increaseBy || 0);
+      const decreaseBy = Number(priceUpdate?.decreaseBy || 0);
+      const delta = (Number.isFinite(increaseBy) ? increaseBy : 0) - (Number.isFinite(decreaseBy) ? decreaseBy : 0);
+
+      if (amount != null && delta !== 0) {
+        products.forEach((product) => {
+          const patchBody = {};
+
+          const currentRate = Number.parseFloat(String(product?.rate ?? '').trim());
+          if (Number.isFinite(currentRate) && currentRate === amount) {
+            patchBody.rate = roundTo2dpString(Math.max(0, currentRate + delta));
+          }
+
+          const rawOption2 = product?.option2_value;
+          const parsed = getOption2Array(rawOption2);
+          if (parsed && parsed.length) {
+            let option2Changed = false;
+            const nextItems = parsed.map((item) => ({ ...item }));
+
+            nextItems.forEach((item) => {
+              const currentPrice = Number.parseFloat(String(item?.price ?? '').trim());
+              if (!Number.isFinite(currentPrice)) return;
+              if (currentPrice !== amount) return;
+              item.price = roundTo2dpString(Math.max(0, currentPrice + delta));
+              option2Changed = true;
+            });
+
+            if (option2Changed) {
+              patchBody.option2_value = buildOption2PatchValue(rawOption2, nextItems);
+            }
+          }
+
+          if (!Object.keys(patchBody).length) return;
+          patches.push(
+            supabaseRestRequest(`/products?id=eq.${product.id}`, {
+              method: 'PATCH',
+              body: patchBody,
+              accessToken: token,
+            })
+          );
+        });
+      }
+    }
+
+    if (!patches.length) {
+      return { updated: 0 };
+    }
+
+    await Promise.all(patches);
+    return { updated: patches.length };
   } catch (error) {
     handleSupabaseAuthError(error);
   }

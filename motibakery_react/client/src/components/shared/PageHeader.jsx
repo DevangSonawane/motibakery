@@ -1,4 +1,10 @@
-export function PageHeader({ title, subtitle, action, secondaryAction }) {
+export function PageHeader({ title, subtitle, action, secondaryAction, secondaryActions }) {
+  const resolvedSecondaryActions = Array.isArray(secondaryActions)
+    ? secondaryActions
+    : secondaryAction
+      ? [secondaryAction]
+      : [];
+
   return (
     <div className="mb-6 border-b border-gray-200 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -8,15 +14,16 @@ export function PageHeader({ title, subtitle, action, secondaryAction }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {secondaryAction ? (
+          {resolvedSecondaryActions.map((item) => (
             <button
+              key={item.key || item.label}
               type="button"
-              onClick={secondaryAction.onClick}
+              onClick={item.onClick}
               className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              {secondaryAction.label}
+              {item.label}
             </button>
-          ) : null}
+          ))}
           {action ? (
             <button
               type="button"

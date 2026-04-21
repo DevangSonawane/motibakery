@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { useCakes, useCreateCake, useDeleteCake, useImportCakes, useUpdateCake } from '@/hooks/useCakes';
+import { useBulkUpdateCakes, useCakes, useCreateCake, useDeleteCake, useImportCakes, useUpdateCake } from '@/hooks/useCakes';
+import { BulkEditModal } from './BulkEditModal';
 
 const EMPTY_FORM = {
   handle: '',
@@ -46,14 +47,6 @@ const slugify = (value) =>
 
 const formatDisplayIndex = (index) => `#C${String(index).padStart(3, '0')}`;
 
-const safeJsonParse = (value) => {
-  try {
-    return JSON.parse(String(value));
-  } catch {
-    return null;
-  }
-};
-
 const normalizeFlavourItems = (items) => {
   if (!Array.isArray(items)) return [];
   return items.map((item) => {
@@ -68,8 +61,7 @@ const normalizeFlavourItems = (items) => {
 };
 
 const parseFlavourItems = (product) => {
-  const parsed = safeJsonParse(product?.option2Value);
-  const parsedItems = normalizeFlavourItems(parsed).filter((item) => item.name || item.price || item.customName);
+  const parsedItems = normalizeFlavourItems(product?.option2Value).filter((item) => item.name || item.price || item.customName);
   if (parsedItems.length) return parsedItems;
 
   const fallbackCount = Math.max(1, Number(product?.flavours || 1) || 1);
@@ -334,8 +326,8 @@ function toFormState(product) {
     title: product.title || product.name || '',
     name: product.name || '',
     category: product.category || '',
-    rate: product.rate || '',
-    weight: product.weight || '',
+    rate: product.rate == null ? '' : String(product.rate),
+    weight: product.weight == null ? '' : String(product.weight),
     minWeight: product.minWeight == null ? '' : String(product.minWeight),
     maxWeight: product.maxWeight == null ? '' : String(product.maxWeight),
     flavours: String(product.flavours || 1),
@@ -343,7 +335,7 @@ function toFormState(product) {
     option1Name: product.option1Name || 'Title',
     option1Value: product.option1Value || 'Default Title',
     option2Name: product.option2Name || '',
-    option2Value: product.option2Value || '',
+    option2Value: product.option2Value ?? null,
     option3Name: product.option3Name || '',
     option3Value: product.option3Value || '',
     coo: product.coo || '',
@@ -364,6 +356,7 @@ export function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingProduct, setEditingProduct] = useState(null);
   const csvInputRef = useRef(null);
@@ -373,6 +366,49 @@ export function ProductsPage() {
   const updateCake = useUpdateCake();
   const deleteCake = useDeleteCake();
   const importCakes = useImportCakes();
+  const bulkUpdateCakes = useBulkUpdateCakes();
+
+  const amountOptions = useMemo(() => {
+    const amounts = [];
+
+    products.forEach((product) => {
+      const baseRate = Number.parseFloat(String(product?.rate ?? '').trim());
+      if (Number.isFinite(baseRate)) amounts.push(baseRate);
+
+      const items = normalizeFlavourItems(product?.option2Value);
+      items.forEach((item) => {
+        const price = Number.parseFloat(String(item?.price ?? '').trim());
+        if (!Number.isFinite(price)) return;
+        amounts.push(price);
+      });
+    });
+
+    return Array.from(new Set(amounts)).sort((a, b) => a - b);
+  }, [products]);
+
+  const amountCounts = useMemo(() => {
+    const counts = new Map();
+
+    products.forEach((product) => {
+      const pricesInProduct = new Set();
+
+      const baseRate = Number.parseFloat(String(product?.rate ?? '').trim());
+      if (Number.isFinite(baseRate)) pricesInProduct.add(baseRate);
+
+      const items = normalizeFlavourItems(product?.option2Value);
+      items.forEach((item) => {
+        const price = Number.parseFloat(String(item?.price ?? '').trim());
+        if (!Number.isFinite(price)) return;
+        pricesInProduct.add(price);
+      });
+
+      pricesInProduct.forEach((price) => {
+        counts.set(price, (counts.get(price) || 0) + 1);
+      });
+    });
+
+    return Object.fromEntries(Array.from(counts.entries()).map(([amount, count]) => [String(amount), count]));
+  }, [products]);
 
   const rows = useMemo(() => {
     const filtered = products.filter((product) => {
@@ -477,7 +513,7 @@ export function ProductsPage() {
       option1Name: normalizeText(form.option1Name) || 'Weight',
       option1Value: weightValue || normalizeText(form.option1Value) || 'Default Title',
       option2Name: flavourItemsToPersist.length ? 'flavours' : normalizeText(form.option2Name),
-      option2Value: flavourItemsToPersist.length ? JSON.stringify(flavourItemsToPersist) : normalizeText(form.option2Value),
+      option2Value: flavourItemsToPersist.length ? flavourItemsToPersist : Array.isArray(form.option2Value) ? form.option2Value : null,
       option3Name: normalizeText(form.option3Name),
       option3Value: normalizeText(form.option3Value),
       coo: normalizeText(form.coo),
@@ -641,10 +677,23 @@ export function ProductsPage() {
             setIsModalOpen(true);
           },
         }}
-        secondaryAction={{ label: importCakes.isPending ? 'Importing...' : 'Import CSV', onClick: handleImportClick }}
+        secondaryActions={[
+          { key: 'bulk-edit', label: 'Bulk Edit', onClick: () => setIsBulkEditOpen(true) },
+          { key: 'import-csv', label: importCakes.isPending ? 'Importing...' : 'Import CSV', onClick: handleImportClick },
+        ]}
       />
 
       <input ref={csvInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvImport} />
+
+      {isBulkEditOpen ? (
+        <BulkEditModal
+          flavourOptions={FLAVOUR_OPTIONS}
+          amountOptions={amountOptions}
+          amountCounts={amountCounts}
+          onApply={(spec) => bulkUpdateCakes.mutateAsync(spec)}
+          onClose={() => setIsBulkEditOpen(false)}
+        />
+      ) : null}
 
       {isError ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{String(error?.message || 'Failed to load products')}</div> : null}
 
