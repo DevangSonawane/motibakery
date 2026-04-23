@@ -50,7 +50,12 @@ class CounterHomeScreen extends ConsumerWidget {
       bottomNavigationBar: const CounterBottomNav(currentIndex: 0),
       body: RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: () async => ref.refresh(inventoryProductsProvider.future),
+        onRefresh: () async {
+          // Ensure we don't serve stale min/max weight constraints from the
+          // ProductService in-memory cache.
+          ref.read(productServiceProvider).clearCache();
+          final _ = await ref.refresh(inventoryProductsProvider.future);
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: <Widget>[

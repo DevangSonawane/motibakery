@@ -491,6 +491,7 @@ export function ProductsPage() {
     const flavourItemsToPersist = normalizeFlavourItems(form.flavourItems).filter((item) => item.name || item.price || item.customName);
     const flavoursCount = Math.max(1, flavourItemsToPersist.length || Number(form.flavours) || 1);
     const weightValue = normalizeText(form.weight);
+    const rateValue = normalizeText(form.rate);
     const minWeightValue = normalizeText(form.minWeight);
     const maxWeightValue = normalizeText(form.maxWeight);
     const minWeightNumber = minWeightValue === '' ? null : Number(minWeightValue);
@@ -503,8 +504,8 @@ export function ProductsPage() {
       title: normalizeText(form.title) || normalizeText(form.name),
       name: normalizeText(form.name),
       category: normalizeText(form.category) || 'General',
-      rate: normalizeText(form.rate) || '-',
-      weight: weightValue || '-',
+      ...(rateValue && rateValue !== '-' ? { rate: rateValue } : {}),
+      ...(weightValue && weightValue !== '-' ? { weight: weightValue } : {}),
       minWeight,
       maxWeight,
       flavours: flavoursCount,

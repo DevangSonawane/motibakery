@@ -99,7 +99,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                       'Date',
                       DateFormat('EEE, dd MMM yyyy').format(_asIst(order.deliveryDate)),
                     ),
-                    _line(context, 'Time', _deliveryTimeText(order)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -283,13 +282,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         ],
       ),
     );
-  }
-
-  String _deliveryTimeText(Order order) {
-    if (order.deliveryTime == null) {
-      return '-';
-    }
-    return DateFormat('hh:mm a').format(_asIst(order.deliveryTime!));
   }
 
   DateTime _asIst(DateTime value) {

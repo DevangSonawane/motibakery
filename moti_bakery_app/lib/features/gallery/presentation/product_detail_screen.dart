@@ -375,7 +375,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (clean.isEmpty || clean == '-') return 'Price on request';
 
     final hasCurrency = clean.contains('₹');
-    final lower = clean.toLowerCase();
     final fromRegex = RegExp(r'^\s*from\s+', caseSensitive: false);
     if (hasCurrency) {
       return clean.replaceFirst(fromRegex, '');

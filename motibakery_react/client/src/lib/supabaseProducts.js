@@ -19,10 +19,10 @@ function handleSupabaseAuthError(error) {
   throw error;
 }
 
-const toFiniteNumberOrNull = (value) => {
-  if (value == null) return null;
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : null;
+const toTrimmedStringOrDash = (value) => {
+  if (value == null) return '-';
+  const text = String(value).trim();
+  return text.length ? text : '-';
 };
 
 const safeParseJsonArray = (value) => {
@@ -43,8 +43,8 @@ function normalizeProductRow(row) {
     title: row.title || row.name || '',
     name: row.name,
     category: row.category || 'General',
-    rate: toFiniteNumberOrNull(row.rate),
-    weight: toFiniteNumberOrNull(row.weight),
+    rate: toTrimmedStringOrDash(row.rate),
+    weight: toTrimmedStringOrDash(row.weight),
     minWeight: row.min_weight == null ? null : Number(row.min_weight),
     maxWeight: row.max_weight == null ? null : Number(row.max_weight),
     flavours: String(row.flavours || 1),
@@ -125,7 +125,7 @@ export async function createProductInSupabase(payload) {
       preferReturnRepresentation: true,
     });
     if (Array.isArray(rows) && rows[0]) return normalizeProductRow(rows[0]);
-    return null;
+    throw new Error('No product was created. Check Supabase RLS policy/permissions.');
   } catch (error) {
     handleSupabaseAuthError(error);
   }
@@ -174,7 +174,7 @@ export async function updateProductInSupabase(id, payload) {
       preferReturnRepresentation: true,
     });
     if (Array.isArray(rows) && rows[0]) return normalizeProductRow(rows[0]);
-    return null;
+    throw new Error('No product was updated. Check Supabase RLS policy/permissions (admin) and that the product id exists.');
   } catch (error) {
     handleSupabaseAuthError(error);
   }

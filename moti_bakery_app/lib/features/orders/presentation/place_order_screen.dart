@@ -37,7 +37,6 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   late String _selectedFlavour;
   late double _weight;
   DateTime _deliveryDate = DateTime.now();
-  TimeOfDay _deliveryTime = TimeOfDay.now();
   bool _isSubmitting = false;
   XFile? _referenceImage;
 
@@ -67,16 +66,6 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
     );
     if (picked != null) {
       setState(() => _deliveryDate = picked);
-    }
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _deliveryTime,
-    );
-    if (picked != null) {
-      setState(() => _deliveryTime = picked);
     }
   }
 
@@ -130,6 +119,32 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   }
 
   Future<void> _submit(double totalPrice) async {
+    final typedWeight = double.tryParse(_weightController.text.trim());
+    if (typedWeight != null) {
+      if (typedWeight < widget.cake.minWeight) {
+        await _showWeightAlert(
+          title: 'Weight too low',
+          message:
+              'Please order within ${widget.cake.minWeight.toStringAsFixed(1)} - ${widget.cake.maxWeight.toStringAsFixed(1)} kg.',
+        );
+        if (mounted) {
+          _syncWeight(widget.cake.minWeight);
+        }
+        return;
+      }
+      if (typedWeight > widget.cake.maxWeight) {
+        await _showWeightAlert(
+          title: 'Weight too high',
+          message:
+              'Please order within ${widget.cake.minWeight.toStringAsFixed(1)} - ${widget.cake.maxWeight.toStringAsFixed(1)} kg.',
+        );
+        if (mounted) {
+          _syncWeight(widget.cake.maxWeight);
+        }
+        return;
+      }
+    }
+
     if (!_formKey.currentState!.validate() || _isSubmitting) {
       return;
     }
@@ -159,13 +174,6 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
       final random = Random();
       final now = DateTime.now();
       final scheduledDate = DateTime(_deliveryDate.year, _deliveryDate.month, _deliveryDate.day);
-      final scheduledTime = DateTime(
-        _deliveryDate.year,
-        _deliveryDate.month,
-        _deliveryDate.day,
-        _deliveryTime.hour,
-        _deliveryTime.minute,
-      );
       final order = Order(
         id: '#ORD-${now.year}-${1000 + random.nextInt(8999)}',
         cakeId: widget.cake.id,
@@ -173,7 +181,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
         flavour: _selectedFlavour,
         weight: _weight,
         deliveryDate: scheduledDate,
-        deliveryTime: scheduledTime,
+        deliveryTime: null,
         customerName: _customerController.text.trim().isEmpty
             ? null
             : _customerController.text.trim(),
@@ -213,6 +221,26 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _showWeightAlert({
+    required String title,
+    required String message,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -406,32 +434,6 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Delivery Time',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: _pickTime,
-                borderRadius: BorderRadius.circular(8),
-                child: Ink(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.borderLight),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.access_time_outlined, size: 20),
-                      const SizedBox(width: 10),
-                      Text(_deliveryTime.format(context)),
-                    ],
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _customerController,

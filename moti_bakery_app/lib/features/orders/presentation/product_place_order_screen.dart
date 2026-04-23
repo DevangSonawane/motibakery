@@ -52,8 +52,8 @@ class _ProductPlaceOrderScreenState
   late final List<String> _variants;
   late String _selectedVariant;
   int _quantity = 1;
+  double _selectedWeightKg = 1;
   DateTime _deliveryDate = DateTime.now();
-  TimeOfDay _deliveryTime = TimeOfDay.now();
   bool _isSubmitting = false;
   XFile? _referenceImage;
 
@@ -66,6 +66,15 @@ class _ProductPlaceOrderScreenState
     } else {
       _selectedVariant = _variants.isNotEmpty ? _variants.first : 'Standard';
     }
+
+    final range = widget.product.weightRangeKg;
+    final minKg = range.minKg;
+    final maxKg = range.maxKg;
+    var initialKg = _weightInKg();
+    if (minKg != null) initialKg = initialKg < minKg ? minKg : initialKg;
+    if (maxKg != null) initialKg = initialKg > maxKg ? maxKg : initialKg;
+    if (initialKg <= 0) initialKg = minKg ?? 1;
+    _selectedWeightKg = initialKg;
   }
 
   @override
@@ -86,16 +95,6 @@ class _ProductPlaceOrderScreenState
     );
     if (picked != null) {
       setState(() => _deliveryDate = picked);
-    }
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _deliveryTime,
-    );
-    if (picked != null) {
-      setState(() => _deliveryTime = picked);
     }
   }
 
@@ -146,6 +145,24 @@ class _ProductPlaceOrderScreenState
 
   double _totalPrice() => _unitPrice() * _quantity;
 
+  double _perUnitWeightKg() {
+    final variant = _selectedVariant.toLowerCase();
+    final number = _extractFirstNumber(variant);
+    if (number == null || number <= 0) {
+      return 1;
+    }
+
+    if (variant.contains('kg')) {
+      return number;
+    }
+    if (variant.contains('gm') ||
+        variant.contains('gms') ||
+        variant.contains('g')) {
+      return number / 1000;
+    }
+    return 1;
+  }
+
   double _weightInKg() {
     final variant = _selectedVariant.toLowerCase();
     final number = _extractFirstNumber(variant);
@@ -164,6 +181,30 @@ class _ProductPlaceOrderScreenState
     return _quantity.toDouble();
   }
 
+  (double, double) _weightSliderBoundsKg() {
+    final range = widget.product.weightRangeKg;
+    final configuredMinKg = range.minKg;
+    final configuredMaxKg = range.maxKg;
+    final perUnitKg = _perUnitWeightKg();
+
+    final minKg = ((configuredMinKg != null && configuredMinKg > 0)
+        ? configuredMinKg
+        : (perUnitKg > 0 ? perUnitKg : 1))
+        .toDouble();
+    var maxKg = (configuredMaxKg != null && configuredMaxKg > 0)
+        ? configuredMaxKg
+        : (perUnitKg > 0 ? perUnitKg * 10 : 10);
+    if (maxKg <= minKg) {
+      maxKg = minKg + (perUnitKg > 0 ? perUnitKg : 1);
+    }
+    return (minKg, maxKg.toDouble());
+  }
+
+  double _selectedWeightClampedKg() {
+    final bounds = _weightSliderBoundsKg();
+    return _selectedWeightKg.clamp(bounds.$1, bounds.$2).toDouble();
+  }
+
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate() || _isSubmitting) {
       return;
@@ -174,26 +215,47 @@ class _ProductPlaceOrderScreenState
       return;
     }
 
+    final range = widget.product.weightRangeKg;
+    const epsilon = 1e-6;
+    final selectedKg = _selectedWeightClampedKg();
+    if (range.minKg != null && selectedKg + epsilon < range.minKg!) {
+      final minText = range.minKg!.toStringAsFixed(2);
+      final maxText = range.maxKg?.toStringAsFixed(2);
+      await _showWeightAlert(
+        title: 'Weight too low',
+        message:
+            maxText == null
+                ? 'Please order at least $minText kg.'
+                : 'Please order within $minText - $maxText kg.',
+      );
+      return;
+    }
+    if (range.maxKg != null && selectedKg - epsilon > range.maxKg!) {
+      final minText = range.minKg?.toStringAsFixed(2);
+      final maxText = range.maxKg!.toStringAsFixed(2);
+      await _showWeightAlert(
+        title: 'Weight too high',
+        message:
+            minText == null
+                ? 'Please order no more than $maxText kg.'
+                : 'Please order within $minText - $maxText kg.',
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
       final now = DateTime.now();
       final scheduledDate = DateTime(_deliveryDate.year, _deliveryDate.month, _deliveryDate.day);
-      final scheduledTime = DateTime(
-        _deliveryDate.year,
-        _deliveryDate.month,
-        _deliveryDate.day,
-        _deliveryTime.hour,
-        _deliveryTime.minute,
-      );
       final order = Order(
         id: '#ORD-${now.year}-${1000 + Random().nextInt(8999)}',
         cakeId: widget.product.id,
         cakeName: widget.product.displayTitle,
         flavour: _selectedVariant,
-        weight: _weightInKg(),
+        weight: selectedKg,
         deliveryDate: scheduledDate,
-        deliveryTime: scheduledTime,
+        deliveryTime: null,
         customerName: _customerNameController.text.trim(),
         customerPhone: _customerPhoneController.text.trim(),
         notes: _buildNotes(),
@@ -225,6 +287,26 @@ class _ProductPlaceOrderScreenState
     }
   }
 
+  Future<void> _showWeightAlert({
+    required String title,
+    required String message,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String? _buildNotes() {
     final raw = _notesController.text.trim();
     if (raw.isEmpty) {
@@ -235,6 +317,20 @@ class _ProductPlaceOrderScreenState
 
   @override
   Widget build(BuildContext context) {
+    final range = widget.product.weightRangeKg;
+    final configuredMinKg = range.minKg;
+    final configuredMaxKg = range.maxKg;
+    final perUnitKg = _perUnitWeightKg();
+    final sliderMinKg = (configuredMinKg != null && configuredMinKg > 0) ? configuredMinKg : perUnitKg;
+    var sliderMaxKg = (configuredMaxKg != null && configuredMaxKg > 0)
+        ? configuredMaxKg
+        : (perUnitKg * 10);
+    if (sliderMaxKg <= sliderMinKg) {
+      sliderMaxKg = sliderMinKg + perUnitKg;
+    }
+    final showWeightSlider = sliderMinKg > 0 && sliderMaxKg > sliderMinKg;
+    final selectedKg = _selectedWeightClampedKg();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Order Product')),
       bottomNavigationBar: SafeArea(
@@ -369,6 +465,40 @@ class _ProductPlaceOrderScreenState
               },
             ),
             const SizedBox(height: 14),
+            if (showWeightSlider) ...[
+              Text(
+                'Weight (kg)',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 8),
+              Slider(
+                value: selectedKg,
+                min: sliderMinKg,
+                max: sliderMaxKg,
+                divisions:
+                    ((sliderMaxKg - sliderMinKg) *
+                            10)
+                        .round()
+                        .clamp(1, 500)
+                        .toInt(),
+                label: '${selectedKg.toStringAsFixed(2)} kg',
+                onChanged: (value) => setState(() => _selectedWeightKg = value),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${sliderMinKg.toStringAsFixed(2)} kg',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    '${sliderMaxKg.toStringAsFixed(2)} kg',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
             Text('Delivery Date', style: Theme.of(context).textTheme.bodyLarge),
             const SizedBox(height: 8),
             InkWell(
@@ -388,30 +518,6 @@ class _ProductPlaceOrderScreenState
                     const Icon(Icons.calendar_today_outlined, size: 20),
                     const SizedBox(width: 10),
                     Text(DateFormat('dd MMMM yyyy').format(_deliveryDate)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text('Delivery Time', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: _pickTime,
-              borderRadius: BorderRadius.circular(8),
-              child: Ink(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.borderLight),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.access_time_outlined, size: 20),
-                    const SizedBox(width: 10),
-                    Text(_deliveryTime.format(context)),
                   ],
                 ),
               ),
@@ -470,6 +576,7 @@ class _ProductPlaceOrderScreenState
                   const SizedBox(height: 6),
                   Text('Variant: $_selectedVariant'),
                   Text('Quantity: $_quantity'),
+                  Text('Weight: ${selectedKg.toStringAsFixed(2)} kg'),
                   Text('Unit Price: ${_currency(_unitPrice())}'),
                   const SizedBox(height: 4),
                   Text(

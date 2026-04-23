@@ -31,6 +31,8 @@ class Product {
     required this.image,
     required this.createdAt,
     required this.updatedAt,
+    this.minWeightKg,
+    this.maxWeightKg,
   });
 
   factory Product.fromMap(Map<String, dynamic> map) {
@@ -64,6 +66,8 @@ class Product {
       image: _string(map['image']),
       createdAt: _nullableString(map['created_at']),
       updatedAt: _nullableString(map['updated_at']),
+      minWeightKg: _nullableDouble(map['min_weight']),
+      maxWeightKg: _nullableDouble(map['max_weight']),
     );
   }
 
@@ -96,6 +100,8 @@ class Product {
   final String image;
   final String? createdAt;
   final String? updatedAt;
+  final double? minWeightKg;
+  final double? maxWeightKg;
 
   String get displayTitle {
     if (title.trim().isNotEmpty) {
@@ -111,6 +117,21 @@ class Product {
     final categoryValue = category.toLowerCase();
     final titleValue = displayTitle.toLowerCase();
     return categoryValue.contains('cake') || titleValue.contains('cake');
+  }
+
+  /// Parsed min/max weight constraints (in kilograms) from the `weight` field.
+  ///
+  /// The backend currently stores weight as a free-form string (examples seen in
+  /// uploads: `0.5-5 kg`, `0.5 kg - 3 kg`, `500g - 2kg`). This helper extracts
+  /// up to two numeric values and converts grams to kg when the string appears
+  /// to be in grams.
+  ///
+  /// If parsing fails, returns `(minKg: null, maxKg: null)`.
+  ({double? minKg, double? maxKg}) get weightRangeKg {
+    if (minWeightKg != null || maxWeightKg != null) {
+      return (minKg: minWeightKg, maxKg: maxWeightKg);
+    }
+    return _parseWeightRangeKg(weight);
   }
 
   List<String> get optionValues {
@@ -275,5 +296,59 @@ class Product {
       return value;
     }
     return int.tryParse(value.toString());
+  }
+
+  static double? _nullableDouble(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value.toString());
+  }
+
+  static ({double? minKg, double? maxKg}) _parseWeightRangeKg(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return (minKg: null, maxKg: null);
+    }
+
+    final values = <double>[];
+    for (final match in RegExp(r'(\d+(?:\.\d+)?)').allMatches(trimmed)) {
+      final parsed = double.tryParse(match.group(1)!);
+      if (parsed != null) {
+        values.add(parsed);
+      }
+    }
+    if (values.isEmpty) {
+      return (minKg: null, maxKg: null);
+    }
+
+    final lower = trimmed.toLowerCase();
+    final looksLikeGrams = (lower.contains('gm') ||
+            lower.contains('gms') ||
+            lower.contains('gram') ||
+            lower.contains('grams')) &&
+        !lower.contains('kg');
+    final normalizedValues = looksLikeGrams
+        ? values.map((value) => value / 1000).toList(growable: false)
+        : values;
+
+    if (normalizedValues.length >= 2) {
+      normalizedValues.sort();
+      return (minKg: normalizedValues.first, maxKg: normalizedValues.last);
+    }
+
+    final only = normalizedValues.first;
+    final hasMin = lower.contains('min');
+    final hasMax = lower.contains('max');
+    if (hasMin && !hasMax) {
+      return (minKg: only, maxKg: null);
+    }
+    if (hasMax && !hasMin) {
+      return (minKg: null, maxKg: only);
+    }
+    return (minKg: only, maxKg: only);
   }
 }

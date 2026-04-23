@@ -7,11 +7,22 @@ class ProductService {
   static List<Product>? _cachedProducts;
   static DateTime? _cacheTime;
   static const Duration _cacheTtl = Duration(minutes: 10);
+  // Bump this when the selected columns / Product mapping changes so hot-reload
+  // sessions don't keep stale cached rows.
+  static const int _cacheSchemaVersion = 2;
+  static int? _cachedSchemaVersion;
+
+  void clearCache() {
+    _cachedProducts = null;
+    _cacheTime = null;
+    _cachedSchemaVersion = null;
+  }
 
   Future<List<Product>> fetchProducts() async {
     final now = DateTime.now();
     if (_cachedProducts != null &&
         _cacheTime != null &&
+        _cachedSchemaVersion == _cacheSchemaVersion &&
         now.difference(_cacheTime!) < _cacheTtl) {
       return _cachedProducts!;
     }
@@ -26,7 +37,7 @@ class ProductService {
       final rows = await Supabase.instance.client
           .from('products')
           .select(
-            'id,handle,title,option1_name,option1_value,option2_name,option2_value,option3_name,option3_value,name,category,rate,weight,flavours,status,image,created_at,updated_at',
+            'id,handle,title,option1_name,option1_value,option2_name,option2_value,option3_name,option3_value,name,category,rate,weight,min_weight,max_weight,flavours,status,image,created_at,updated_at',
           )
           .eq('status', 'active')
           .limit(120)
@@ -34,6 +45,7 @@ class ProductService {
       final products = rows.map(Product.fromMap).toList(growable: false);
       _cachedProducts = products;
       _cacheTime = now;
+      _cachedSchemaVersion = _cacheSchemaVersion;
       return products;
     } on PostgrestException catch (error) {
       throw ProductException(error.message);
