@@ -70,11 +70,23 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   }
 
   void _syncWeight(double value) {
+    // Slider changes are always within the allowed range, so keep controller
+    // in sync.
     final next = value.clamp(widget.cake.minWeight, widget.cake.maxWeight);
     setState(() {
       _weight = next;
       _weightController.text = _weight.toStringAsFixed(1);
     });
+  }
+
+  void _onWeightTextChanged(String value) {
+    final parsed = double.tryParse(value.trim());
+    if (parsed == null) {
+      return;
+    }
+    // Don't clamp typed values. We want the user to see the validation message
+    // live, and we must block ordering if it's outside the allowed range.
+    setState(() => _weight = parsed);
   }
 
   Future<void> _pickReferenceImage() async {
@@ -120,29 +132,15 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 
   Future<void> _submit(double totalPrice) async {
     final typedWeight = double.tryParse(_weightController.text.trim());
-    if (typedWeight != null) {
-      if (typedWeight < widget.cake.minWeight) {
-        await _showWeightAlert(
-          title: 'Weight too low',
-          message:
-              'Please order within ${widget.cake.minWeight.toStringAsFixed(1)} - ${widget.cake.maxWeight.toStringAsFixed(1)} kg.',
-        );
-        if (mounted) {
-          _syncWeight(widget.cake.minWeight);
-        }
-        return;
-      }
-      if (typedWeight > widget.cake.maxWeight) {
-        await _showWeightAlert(
-          title: 'Weight too high',
-          message:
-              'Please order within ${widget.cake.minWeight.toStringAsFixed(1)} - ${widget.cake.maxWeight.toStringAsFixed(1)} kg.',
-        );
-        if (mounted) {
-          _syncWeight(widget.cake.maxWeight);
-        }
-        return;
-      }
+    if (typedWeight == null ||
+        typedWeight < widget.cake.minWeight ||
+        typedWeight > widget.cake.maxWeight) {
+      await _showWeightAlert(
+        title: 'Invalid weight',
+        message:
+            'Please order within ${widget.cake.minWeight.toStringAsFixed(1)} - ${widget.cake.maxWeight.toStringAsFixed(1)} kg.',
+      );
+      return;
     }
 
     if (!_formKey.currentState!.validate() || _isSubmitting) {
@@ -327,6 +325,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
       ),
       body: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Column(
@@ -356,16 +355,13 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                   }
                   return null;
                 },
-                onChanged: (value) {
-                  final parsed = double.tryParse(value);
-                  if (parsed != null) {
-                    _syncWeight(parsed);
-                  }
-                },
+                onChanged: _onWeightTextChanged,
               ),
               const SizedBox(height: 8),
               CupertinoSlider(
-                value: _weight,
+                value: _weight
+                    .clamp(widget.cake.minWeight, widget.cake.maxWeight)
+                    .toDouble(),
                 min: widget.cake.minWeight,
                 max: widget.cake.maxWeight,
                 divisions:
