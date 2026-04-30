@@ -42,6 +42,8 @@ class ProductPlaceOrderScreen extends ConsumerStatefulWidget {
 
 class _ProductPlaceOrderScreenState
     extends ConsumerState<ProductPlaceOrderScreen> {
+  static const double _weightStepKg = 0.5;
+
   final _formKey = GlobalKey<FormState>();
   final _customerNameController = TextEditingController();
   final _customerPhoneController = TextEditingController();
@@ -74,6 +76,9 @@ class _ProductPlaceOrderScreenState
     if (minKg != null) initialKg = initialKg < minKg ? minKg : initialKg;
     if (maxKg != null) initialKg = initialKg > maxKg ? maxKg : initialKg;
     if (initialKg <= 0) initialKg = minKg ?? 1;
+    initialKg = _snapToStepKg(initialKg);
+    if (minKg != null) initialKg = max(initialKg, minKg);
+    if (maxKg != null) initialKg = min(initialKg, maxKg);
     _selectedWeightKg = initialKg;
   }
 
@@ -181,6 +186,28 @@ class _ProductPlaceOrderScreenState
     return _quantity.toDouble();
   }
 
+  double _snapToStepKg(double value) {
+    return (value / _weightStepKg).round() * _weightStepKg;
+  }
+
+  (double, double) _effectiveWeightSliderBoundsKg() {
+    final bounds = _weightSliderBoundsKg();
+    final rawMinKg = bounds.$1;
+    final rawMaxKg = bounds.$2;
+
+    var minKg = (rawMinKg / _weightStepKg).ceil() * _weightStepKg;
+    var maxKg = (rawMaxKg / _weightStepKg).floor() * _weightStepKg;
+
+    // Fallback: if the allowed range is too small to fit a full step, keep the
+    // raw bounds so the UI still works.
+    if (maxKg <= minKg) {
+      minKg = rawMinKg;
+      maxKg = rawMaxKg;
+    }
+
+    return (minKg.toDouble(), maxKg.toDouble());
+  }
+
   (double, double) _weightSliderBoundsKg() {
     final range = widget.product.weightRangeKg;
     final configuredMinKg = range.minKg;
@@ -201,7 +228,7 @@ class _ProductPlaceOrderScreenState
   }
 
   double _selectedWeightClampedKg() {
-    final bounds = _weightSliderBoundsKg();
+    final bounds = _effectiveWeightSliderBoundsKg();
     return _selectedWeightKg.clamp(bounds.$1, bounds.$2).toDouble();
   }
 
@@ -317,17 +344,9 @@ class _ProductPlaceOrderScreenState
 
   @override
   Widget build(BuildContext context) {
-    final range = widget.product.weightRangeKg;
-    final configuredMinKg = range.minKg;
-    final configuredMaxKg = range.maxKg;
-    final perUnitKg = _perUnitWeightKg();
-    final sliderMinKg = (configuredMinKg != null && configuredMinKg > 0) ? configuredMinKg : perUnitKg;
-    var sliderMaxKg = (configuredMaxKg != null && configuredMaxKg > 0)
-        ? configuredMaxKg
-        : (perUnitKg * 10);
-    if (sliderMaxKg <= sliderMinKg) {
-      sliderMaxKg = sliderMinKg + perUnitKg;
-    }
+    final sliderBounds = _effectiveWeightSliderBoundsKg();
+    final sliderMinKg = sliderBounds.$1;
+    final sliderMaxKg = sliderBounds.$2;
     final showWeightSlider = sliderMinKg > 0 && sliderMaxKg > sliderMinKg;
     final selectedKg = _selectedWeightClampedKg();
 
@@ -476,23 +495,25 @@ class _ProductPlaceOrderScreenState
                 min: sliderMinKg,
                 max: sliderMaxKg,
                 divisions:
-                    ((sliderMaxKg - sliderMinKg) *
-                            10)
+                    ((sliderMaxKg - sliderMinKg) / _weightStepKg)
                         .round()
                         .clamp(1, 500)
                         .toInt(),
-                label: '${selectedKg.toStringAsFixed(2)} kg',
-                onChanged: (value) => setState(() => _selectedWeightKg = value),
+                label: '${selectedKg.toStringAsFixed(1)} kg',
+                onChanged: (value) {
+                  final snapped = _snapToStepKg(value);
+                  setState(() => _selectedWeightKg = snapped);
+                },
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '${sliderMinKg.toStringAsFixed(2)} kg',
+                    '${sliderMinKg.toStringAsFixed(1)} kg',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
-                    '${sliderMaxKg.toStringAsFixed(2)} kg',
+                    '${sliderMaxKg.toStringAsFixed(1)} kg',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

@@ -127,11 +127,6 @@ class _OrderConfirmationScreenState extends State<OrderConfirmationScreen> {
                                   order.customerName ?? '-',
                                 ),
                                 _line(context, 'Phone', order.customerPhone ?? '-'),
-                                _line(
-                                  context,
-                                  'Total Paid',
-                                  '₹ ${order.totalPrice.toStringAsFixed(2)}',
-                                ),
                               ],
                             ),
                           ),

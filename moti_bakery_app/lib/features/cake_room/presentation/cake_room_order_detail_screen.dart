@@ -207,8 +207,6 @@ class _CakeRoomOrderDetailScreenState
   Widget build(BuildContext context) {
     final order = widget.order;
     final deliveryMeta = _deliveryMeta(order);
-    final baseRate = order.baseRatePerKg ?? (order.totalPrice / order.weight);
-    final flavourIncrement = order.flavourIncrementPerKg ?? 0;
     final displayOrderId = _displayOrderId(order.id);
 
     return Scaffold(
@@ -404,43 +402,6 @@ class _CakeRoomOrderDetailScreenState
               text: 'No reference image attached',
               icon: Icons.image_not_supported_outlined,
             ),
-          const SizedBox(height: 18),
-          Text('Pricing Info', style: Theme.of(context).textTheme.headlineLarge),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceGray,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                _priceRow(
-                  context,
-                  label: 'Base Rate',
-                  value: '₹${baseRate.toStringAsFixed(0)} /kg',
-                ),
-                _priceRow(
-                  context,
-                  label: 'Flavour Increment',
-                  value: '₹${flavourIncrement.toStringAsFixed(0)} /kg',
-                ),
-                _priceRow(
-                  context,
-                  label: 'Weight',
-                  value: '${order.weight.toStringAsFixed(1)} kg',
-                ),
-                const Divider(height: 14),
-                _priceRow(
-                  context,
-                  label: 'Total',
-                  value: '₹${order.totalPrice.toStringAsFixed(2)}',
-                  emphasize: true,
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -473,36 +434,6 @@ class _CakeRoomOrderDetailScreenState
           ),
         ),
       ],
-    );
-  }
-
-  Widget _priceRow(
-    BuildContext context, {
-    required String label,
-    required String value,
-    bool emphasize = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

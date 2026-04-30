@@ -27,6 +27,8 @@ class PlaceOrderScreen extends ConsumerStatefulWidget {
 }
 
 class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
+  static const double _weightStepKg = 0.5;
+
   final _formKey = GlobalKey<FormState>();
   final _customerController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -72,7 +74,8 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   void _syncWeight(double value) {
     // Slider changes are always within the allowed range, so keep controller
     // in sync.
-    final next = value.clamp(widget.cake.minWeight, widget.cake.maxWeight);
+    final snapped = (value / _weightStepKg).round() * _weightStepKg;
+    final next = snapped.clamp(widget.cake.minWeight, widget.cake.maxWeight);
     setState(() {
       _weight = next;
       _weightController.text = _weight.toStringAsFixed(1);
@@ -365,8 +368,11 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 min: widget.cake.minWeight,
                 max: widget.cake.maxWeight,
                 divisions:
-                    ((widget.cake.maxWeight - widget.cake.minWeight) * 10)
-                        .round(),
+                    ((widget.cake.maxWeight - widget.cake.minWeight) /
+                            _weightStepKg)
+                        .round()
+                        .clamp(1, 500)
+                        .toInt(),
                 activeColor: AppColors.primary,
                 thumbColor: AppColors.primary,
                 onChanged: _syncWeight,
