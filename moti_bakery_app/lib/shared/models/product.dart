@@ -145,18 +145,35 @@ class Product {
         if (decoded is! List) return const [];
         final options = <String>[];
         for (final item in decoded) {
-          if (item is! Map) continue;
-          final name = item['name']?.toString() ?? '';
-          final customName = item['customName']?.toString() ?? '';
-          final picked = name == '__custom__' ? customName : name;
-          final trimmed = picked.trim();
-          if (trimmed.isNotEmpty) {
-            options.add(trimmed);
+          if (item is Map) {
+            final name = item['name']?.toString() ?? '';
+            final customName = item['customName']?.toString() ?? '';
+            final picked = name == '__custom__' ? customName : name;
+            final trimmed = picked.trim();
+            if (trimmed.isNotEmpty) {
+              options.add(trimmed);
+            }
+            continue;
+          }
+          final value = _extractValue(item);
+          if (value != null && value.trim().isNotEmpty) {
+            options.add(value.trim());
           }
         }
         return options;
       } catch (_) {
-        return const [];
+        // Some uploads store flavours/variants as a plain delimited string (not JSON),
+        // or as a "loose object" string like:
+        // `[{name: Pineapple, price: 700.00, customName: }, ...]`.
+        final extracted = _extractNamesFromLooseObjectString(raw);
+        if (extracted.isNotEmpty) {
+          return extracted;
+        }
+        return raw
+            .split(RegExp(r'[,\n|]+'))
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toList(growable: false);
       }
     }
 
@@ -170,7 +187,12 @@ class Product {
         values.addAll(parsed);
         return;
       }
-      for (final part in normalized.split(',')) {
+      final extracted = _extractNamesFromLooseObjectString(normalized);
+      if (extracted.isNotEmpty) {
+        values.addAll(extracted);
+        return;
+      }
+      for (final part in normalized.split(RegExp(r'[,\n|]+'))) {
         final next = part.trim();
         if (next.isNotEmpty) {
           values.add(next);
@@ -269,13 +291,48 @@ class Product {
     return null;
   }
 
+  static List<String> _extractNamesFromLooseObjectString(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return const [];
+    if (!trimmed.contains('name:')) return const [];
+
+    final results = <String>[];
+    final matches = RegExp(r'name\s*:\s*([^,}\]]+)').allMatches(trimmed);
+    for (final match in matches) {
+      final value = match.group(1);
+      if (value == null) continue;
+      var next = value.trim();
+      if (next.startsWith('"') && next.endsWith('"') && next.length >= 2) {
+        next = next.substring(1, next.length - 1).trim();
+      }
+      if (next.startsWith("'") && next.endsWith("'") && next.length >= 2) {
+        next = next.substring(1, next.length - 1).trim();
+      }
+      if (next.isNotEmpty && next != '__custom__') {
+        results.add(next);
+      }
+    }
+    return results;
+  }
+
   static String _string(dynamic value) {
-    return value?.toString() ?? '';
+    if (value == null) return '';
+    if (value is String) return value;
+    if (value is num || value is bool) return value.toString();
+    if (value is List || value is Map) {
+      try {
+        return jsonEncode(value);
+      } catch (_) {
+        return value.toString();
+      }
+    }
+    return value.toString();
   }
 
   static String? _nullableString(dynamic value) {
-    final parsed = value?.toString();
-    if (parsed == null || parsed.trim().isEmpty) {
+    if (value == null) return null;
+    final parsed = _string(value);
+    if (parsed.trim().isEmpty) {
       return null;
     }
     return parsed;

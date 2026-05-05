@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -145,7 +146,7 @@ class _ProductPlaceOrderScreenState
   }
 
   double _unitPrice() {
-    return _resolveUnitPrice(widget.product.rate, _selectedVariant);
+    return _resolveUnitPrice(widget.product, _selectedVariant);
   }
 
   double _totalPrice() => _unitPrice() * _quantity;
@@ -439,7 +440,7 @@ class _ProductPlaceOrderScreenState
                       vertical: 10,
                     ),
                     child: Text(
-                      _selectedVariant,
+                      _variantLabelWithPrice(_selectedVariant),
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
@@ -457,7 +458,14 @@ class _ProductPlaceOrderScreenState
                 items: _variants
                     .map(
                       (variant) =>
-                          DropdownMenuItem(value: variant, child: Text(variant)),
+                          DropdownMenuItem(
+                            value: variant,
+                            child: Text(
+                              _variantLabelWithPrice(variant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                     )
                     .toList(growable: false),
                 onChanged: (value) {
@@ -624,28 +632,92 @@ class _ProductPlaceOrderScreenState
     ).format(value);
   }
 
-  double _resolveUnitPrice(String rate, String variant) {
-    final normalizedRate = rate.trim();
+  String _variantLabelWithPrice(String variant) {
+    final price = _resolveUnitPrice(widget.product, variant);
+    if (price <= 0) return variant;
+    return '$variant • ${_currency(price)}';
+  }
+
+  double _resolveUnitPrice(Product product, String variant) {
+    final normalizedRate = product.rate.trim();
     if (normalizedRate.isEmpty || normalizedRate == '-') {
       return 0;
     }
 
     final segments = normalizedRate.split('|');
     for (final segment in segments) {
-      final parts = segment.split(':');
-      if (parts.length < 2) continue;
+      final parts = _splitKeyValue(segment);
+      if (parts == null) continue;
+      final key = _normalizeVariant(parts.$1);
+      final value = _extractFirstNumber(parts.$2);
+      if (key.isEmpty || value == null) continue;
+      if (key == _normalizeVariant(variant)) return value;
+    }
 
-      final key = parts.first.trim().toLowerCase();
-      final value = _extractFirstNumber(parts.sublist(1).join(':'));
-      if (value == null) continue;
-
-      if (key == variant.toLowerCase()) {
-        return value;
-      }
+    final optionPrice = _priceFromOption2Json(product.option2Value, variant);
+    if (optionPrice != null) {
+      return optionPrice;
     }
 
     final fallback = _extractFirstNumber(normalizedRate);
     return fallback ?? 0;
+  }
+
+  (String, String)? _splitKeyValue(String segment) {
+    final trimmed = segment.trim();
+    if (trimmed.isEmpty) return null;
+
+    int index = trimmed.indexOf(':');
+    String delimiter = ':';
+    if (index == -1) {
+      index = trimmed.indexOf('=');
+      delimiter = '=';
+    }
+    if (index == -1) {
+      index = trimmed.indexOf(' - ');
+      delimiter = ' - ';
+    }
+    if (index == -1) return null;
+    final key = trimmed.substring(0, index).trim();
+    final value = trimmed.substring(index + delimiter.length).trim();
+    return (key, value);
+  }
+
+  String _normalizeVariant(String raw) {
+    final lower = raw.toLowerCase();
+    final buffer = StringBuffer();
+    for (final codeUnit in lower.codeUnits) {
+      final isDigit = codeUnit >= 48 && codeUnit <= 57;
+      final isLower = codeUnit >= 97 && codeUnit <= 122;
+      if (isDigit || isLower) {
+        buffer.writeCharCode(codeUnit);
+      }
+    }
+    return buffer.toString();
+  }
+
+  double? _priceFromOption2Json(String? raw, String variant) {
+    final normalizedVariant = _normalizeVariant(variant);
+    if (normalizedVariant.isEmpty) return null;
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty || !(value.startsWith('[') || value.startsWith('{'))) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! List) return null;
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final name = item['name']?.toString() ?? '';
+        if (_normalizeVariant(name) != normalizedVariant) continue;
+        final price = item['price']?.toString() ?? '';
+        final parsed = double.tryParse(price.trim());
+        if (parsed != null) return parsed;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 
   double? _extractFirstNumber(String raw) {

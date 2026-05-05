@@ -221,7 +221,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       vertical: 10,
                     ),
                     child: Text(
-                      _variantLabel(_variants.first, product),
+                      '${_variantLabel(_variants.first, product)} • ${_priceForVariant(product, _variants.first)}',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
@@ -288,7 +288,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               (variant) => DropdownMenuItem<String>(
                                 value: variant,
                                 child: Text(
-                                  _variantLabel(variant, product),
+                                  '${_variantLabel(variant, product)} • ${_priceForVariant(product, variant)}',
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
                                 ),
