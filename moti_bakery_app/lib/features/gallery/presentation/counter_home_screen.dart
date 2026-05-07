@@ -12,15 +12,50 @@ import '../../../shared/widgets/counter_bottom_nav.dart';
 import '../../../shared/widgets/counter_logout_button.dart';
 import 'product_detail_screen.dart';
 
-class CounterHomeScreen extends ConsumerWidget {
+class CounterHomeScreen extends ConsumerStatefulWidget {
   const CounterHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final productsState = ref.watch(inventoryProductsProvider);
+  ConsumerState<CounterHomeScreen> createState() => _CounterHomeScreenState();
+}
+
+class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.extentAfter > 600) return;
+
+    final notifier = ref.read(inventoryPagedProductsProvider.notifier);
+    notifier.loadMore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productsState = ref.watch(inventoryPagedProductsProvider);
     final filteredProducts = ref.watch(filteredInventoryProductsProvider);
     final categories = ref.watch(inventoryCategoriesProvider);
     final selectedCategory = ref.watch(selectedInventoryCategoryProvider);
+
+    final loadedCount = productsState.valueOrNull?.products.length ?? 0;
+    final totalCount = productsState.valueOrNull?.totalCount;
+    final loadingMore = productsState.valueOrNull?.isLoadingMore ?? false;
+    final loadMoreError = productsState.valueOrNull?.loadMoreError;
 
     return Scaffold(
       appBar: AppBar(
@@ -51,118 +86,168 @@ class CounterHomeScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async {
-          // Ensure we don't serve stale min/max weight constraints from the
-          // ProductService in-memory cache.
           ref.read(productServiceProvider).clearCache();
-          final _ = await ref.refresh(inventoryProductsProvider.future);
+          await ref.read(inventoryPagedProductsProvider.notifier).refresh();
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: <Widget>[
-            TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search inventory...',
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (value) {
-                ref.read(inventorySearchQueryProvider.notifier).state = value;
-              },
-            ),
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: 'All',
-                    selected: selectedCategory == null,
-                    onTap: () =>
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Search inventory...',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (value) {
                         ref
-                                .read(
-                                  selectedInventoryCategoryProvider.notifier,
-                                )
-                                .state =
-                            null,
-                  ),
-                  for (final category in categories)
-                    _FilterChip(
-                      label: category,
-                      selected: selectedCategory == category,
-                      onTap: () {
-                        ref
-                                .read(
-                                  selectedInventoryCategoryProvider.notifier,
-                                )
-                                .state =
-                            category;
+                            .read(inventorySearchQueryProvider.notifier)
+                            .state = value;
                       },
                     ),
-                ],
+                    const SizedBox(height: 10),
+                    Text(
+                      totalCount == null
+                          ? 'Loaded $loadedCount cakes'
+                          : 'Loaded $loadedCount of $totalCount cakes',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _FilterChip(
+                            label: 'All',
+                            selected: selectedCategory == null,
+                            onTap: () => ref
+                                .read(
+                                  selectedInventoryCategoryProvider.notifier,
+                                )
+                                .state = null,
+                          ),
+                          for (final category in categories)
+                            _FilterChip(
+                              label: category,
+                              selected: selectedCategory == category,
+                              onTap: () {
+                                ref
+                                    .read(
+                                      selectedInventoryCategoryProvider.notifier,
+                                    )
+                                    .state = category;
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 16),
             productsState.when(
-              loading: _buildLoading,
-              error: (error, _) => Padding(
+              loading: () => SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(child: _buildLoading()),
+              ),
+              error: (error, _) => SliverPadding(
                 padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Unable to load inventory: ${_errorMessage(error)}',
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    'Unable to load inventory: ${_errorMessage(error)}',
+                  ),
                 ),
               ),
               data: (_) {
                 if (filteredProducts.isEmpty) {
-                  return SizedBox(
-                    height: MediaQuery.sizeOf(context).height * 0.45,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 80,
-                          color: AppColors.textHint,
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 80,
+                              color: AppColors.textHint,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No products found',
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Try a different search or filter',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No products found',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Try a different search or filter',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 }
 
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 2;
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  sliver: SliverLayoutBuilder(
+                    builder: (context, constraints) {
+                      final crossAxisCount =
+                          constraints.crossAxisExtent >= 900 ? 3 : 2;
 
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredProducts.length,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: crossAxisCount == 3 ? 0.78 : 0.7,
-                      ),
-                      itemBuilder: (context, index) {
-                        final product = filteredProducts[index];
-                        return _InventoryCard(
-                          product: product,
-                          products: filteredProducts,
-                          index: index,
-                        );
-                      },
-                    );
-                  },
+                      return SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final product = filteredProducts[index];
+                            return _InventoryCard(
+                              product: product,
+                              products: filteredProducts,
+                              index: index,
+                            );
+                          },
+                          childCount: filteredProducts.length,
+                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: crossAxisCount == 3 ? 0.78 : 0.7,
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
+            if (loadingMore)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              )
+            else if (loadMoreError != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: Text(
+                    'Unable to load more: $loadMoreError',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.redAccent,
+                        ),
+                  ),
+                ),
+              )
+            else
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
       ),

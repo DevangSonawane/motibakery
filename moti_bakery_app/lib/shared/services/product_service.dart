@@ -4,29 +4,16 @@ import '../models/product.dart';
 import 'supabase_bootstrap.dart';
 
 class ProductService {
-  static List<Product>? _cachedProducts;
-  static DateTime? _cacheTime;
-  static const Duration _cacheTtl = Duration(minutes: 10);
-  // Bump this when the selected columns / Product mapping changes so hot-reload
-  // sessions don't keep stale cached rows.
-  static const int _cacheSchemaVersion = 2;
-  static int? _cachedSchemaVersion;
+  static const String _columns =
+      'id,handle,title,option1_name,option1_value,option2_name,option2_value,option3_name,option3_value,name,category,rate,weight,min_weight,max_weight,flavours,status,image,created_at,updated_at';
 
   void clearCache() {
-    _cachedProducts = null;
-    _cacheTime = null;
-    _cachedSchemaVersion = null;
+    // Intentionally a no-op for now. Caching is handled at the provider layer
+    // for pagination.
   }
 
-  Future<List<Product>> fetchProducts() async {
-    final now = DateTime.now();
-    if (_cachedProducts != null &&
-        _cacheTime != null &&
-        _cachedSchemaVersion == _cacheSchemaVersion &&
-        now.difference(_cacheTime!) < _cacheTtl) {
-      return _cachedProducts!;
-    }
-
+  /// Legacy (non-paginated) fetch. Prefer [fetchProductsPage] + pagination.
+  Future<List<Product>> fetchProducts({int limit = 500}) async {
     if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
       throw const ProductException(
         'Supabase is not connected. Run app with --dart-define SUPABASE_URL and SUPABASE_ANON_KEY, then login with a valid Supabase user.',
@@ -36,17 +23,65 @@ class ProductService {
     try {
       final rows = await Supabase.instance.client
           .from('products')
-          .select(
-            'id,handle,title,option1_name,option1_value,option2_name,option2_value,option3_name,option3_value,name,category,rate,weight,min_weight,max_weight,flavours,status,image,created_at,updated_at',
-          )
+          .select(_columns)
           .eq('status', 'active')
-          .limit(120)
+          .limit(limit)
           .order('created_at', ascending: false);
-      final products = rows.map(Product.fromMap).toList(growable: false);
-      _cachedProducts = products;
-      _cacheTime = now;
-      _cachedSchemaVersion = _cacheSchemaVersion;
-      return products;
+      return rows.map(Product.fromMap).toList(growable: false);
+    } on PostgrestException catch (error) {
+      throw ProductException(error.message);
+    } on AuthException catch (error) {
+      throw ProductException(error.message);
+    } catch (error) {
+      throw ProductException(error.toString());
+    }
+  }
+
+  Future<PostgrestResponse<List<dynamic>>> fetchProductsPageWithCount({
+    required int from,
+    required int to,
+  }) async {
+    if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
+      throw const ProductException(
+        'Supabase is not connected. Run app with --dart-define SUPABASE_URL and SUPABASE_ANON_KEY, then login with a valid Supabase user.',
+      );
+    }
+
+    try {
+      return await Supabase.instance.client
+          .from('products')
+          .select(_columns)
+          .eq('status', 'active')
+          .order('created_at', ascending: false)
+          .range(from, to)
+          .count(CountOption.exact);
+    } on PostgrestException catch (error) {
+      throw ProductException(error.message);
+    } on AuthException catch (error) {
+      throw ProductException(error.message);
+    } catch (error) {
+      throw ProductException(error.toString());
+    }
+  }
+
+  Future<List<Product>> fetchProductsPage({
+    required int from,
+    required int to,
+  }) async {
+    if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
+      throw const ProductException(
+        'Supabase is not connected. Run app with --dart-define SUPABASE_URL and SUPABASE_ANON_KEY, then login with a valid Supabase user.',
+      );
+    }
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('products')
+          .select(_columns)
+          .eq('status', 'active')
+          .order('created_at', ascending: false)
+          .range(from, to);
+      return rows.map(Product.fromMap).toList(growable: false);
     } on PostgrestException catch (error) {
       throw ProductException(error.message);
     } on AuthException catch (error) {

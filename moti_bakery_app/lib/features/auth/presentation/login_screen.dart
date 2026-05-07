@@ -45,7 +45,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final user = authController.state.user;
     if (user?.role.name == 'counter') {
-      unawaited(ref.read(inventoryProductsProvider.future));
+      unawaited(ref.read(inventoryPagedProductsProvider.future));
     }
   }
 
