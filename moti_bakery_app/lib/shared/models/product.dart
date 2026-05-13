@@ -71,6 +71,42 @@ class Product {
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'id': id,
+      'handle': handle,
+      'title': title,
+      'option1_name': option1Name,
+      'option1_value': option1Value,
+      'option2_name': option2Name,
+      'option2_value': option2Value,
+      'option3_name': option3Name,
+      'option3_value': option3Value,
+      'sku': sku,
+      'hs_code': hsCode,
+      'coo': coo,
+      'location': location,
+      'bin_name': binName,
+      'incoming': incoming,
+      'unavailable': unavailable,
+      'committed': committed,
+      'available': available,
+      'on_hand_current': onHandCurrent,
+      'on_hand_new': onHandNew,
+      'name': name,
+      'category': category,
+      'rate': rate,
+      'weight': weight,
+      'flavours': flavours,
+      'status': status,
+      'image': image,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      'min_weight': minWeightKg,
+      'max_weight': maxWeightKg,
+    };
+  }
+
   final String id;
   final String handle;
   final String title;

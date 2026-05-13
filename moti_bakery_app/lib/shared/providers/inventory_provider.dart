@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/product.dart';
+import '../services/inventory_cache_service.dart';
 import '../services/product_service.dart';
 
 final productServiceProvider = Provider<ProductService>((ref) => ProductService());
+final inventoryCacheServiceProvider =
+    Provider<InventoryCacheService>((ref) => InventoryCacheService());
 
 final inventorySearchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -64,35 +69,72 @@ class InventoryPagedProductsNotifier
 
   @override
   Future<InventoryProductsState> build() async {
+    final cache = await ref.read(inventoryCacheServiceProvider).readPageIfFresh(0);
+    if (cache != null) {
+      final cachedState = InventoryProductsState(
+        products: cache.products,
+        totalCount: cache.totalCount,
+        pageIndex: 0,
+        pageSize: _pageSize,
+        isLoadingPage: false,
+      );
+      unawaited(_refreshFirstPageInBackground());
+      return cachedState;
+    }
+
     final first = await _fetchPage(pageIndex: 0);
     return first;
   }
 
   Future<void> refresh() async {
+    await ref.read(inventoryCacheServiceProvider).clear();
     state = const AsyncLoading();
     state = await AsyncValue.guard(build);
   }
 
-  Future<void> goToPage(int pageNumber) async {
-    final current = state.valueOrNull;
-    if (current == null) return;
-    if (current.isLoadingPage) return;
+  /// Infinite scroll: appends the next page onto the existing list.
+  Future<void> loadNextPage() async {
+    final initial = state.valueOrNull;
+    if (initial == null) return;
+    if (initial.isLoadingPage) return;
+    if (!initial.hasNextPage) return;
 
-    final pageIndex = pageNumber - 1;
-    if (pageIndex < 0) return;
-    if (pageIndex == current.pageIndex) return;
-    if (pageIndex >= current.totalPages) return;
+    final nextPageIndex = initial.pageIndex + 1;
 
-    state = AsyncData(
-      current.copyWith(isLoadingPage: true, pageError: null),
-    );
+    state = AsyncData(initial.copyWith(isLoadingPage: true, pageError: null));
+
+    final cache = ref.read(inventoryCacheServiceProvider);
+    final cached = await cache.readPageIfFresh(nextPageIndex);
+    if (cached != null) {
+      final latest = state.valueOrNull ?? initial;
+      final merged = <Product>[...latest.products, ...cached.products];
+      state = AsyncData(
+        latest.copyWith(
+          products: merged,
+          totalCount: cached.totalCount,
+          pageIndex: nextPageIndex,
+          isLoadingPage: false,
+        ),
+      );
+      unawaited(_refreshPageInBackground(pageIndex: nextPageIndex));
+      return;
+    }
 
     try {
-      final next = await _fetchPage(pageIndex: pageIndex);
-      state = AsyncData(next);
+      final next = await _fetchPage(pageIndex: nextPageIndex);
+      final latest = state.valueOrNull ?? initial;
+      final merged = <Product>[...latest.products, ...next.products];
+      state = AsyncData(
+        latest.copyWith(
+          products: merged,
+          totalCount: next.totalCount,
+          pageIndex: nextPageIndex,
+          isLoadingPage: false,
+        ),
+      );
     } catch (error) {
       state = AsyncData(
-        current.copyWith(
+        initial.copyWith(
           isLoadingPage: false,
           pageError: error.toString(),
         ),
@@ -100,22 +142,9 @@ class InventoryPagedProductsNotifier
     }
   }
 
-  Future<void> nextPage() async {
-    final current = state.valueOrNull;
-    if (current == null) return;
-    if (!current.hasNextPage) return;
-    await goToPage(current.pageIndex + 2);
-  }
-
-  Future<void> previousPage() async {
-    final current = state.valueOrNull;
-    if (current == null) return;
-    if (!current.hasPreviousPage) return;
-    await goToPage(current.pageIndex);
-  }
-
   Future<InventoryProductsState> _fetchPage({required int pageIndex}) async {
     final service = ref.read(productServiceProvider);
+    final cache = ref.read(inventoryCacheServiceProvider);
 
     final from = pageIndex * _pageSize;
     final to = from + _pageSize - 1;
@@ -125,6 +154,14 @@ class InventoryPagedProductsNotifier
         .map((row) => Product.fromMap(row as Map<String, dynamic>))
         .toList(growable: false);
 
+    unawaited(
+      cache.write(
+        pageIndex: pageIndex,
+        products: products,
+        totalCount: response.count,
+      ),
+    );
+
     return InventoryProductsState(
       products: products,
       totalCount: response.count,
@@ -132,6 +169,67 @@ class InventoryPagedProductsNotifier
       pageSize: _pageSize,
       isLoadingPage: false,
     );
+  }
+
+  Future<void> _refreshFirstPageInBackground() async {
+    final startState = state.valueOrNull;
+    if (startState == null) return;
+    if (startState.isLoadingPage) return;
+    if (startState.pageIndex != 0) return;
+    if (startState.products.length > _pageSize) return;
+
+    try {
+      final next = await _fetchPage(pageIndex: 0);
+      final latest = state.valueOrNull;
+      if (latest == null) return;
+      if (latest.products.length > _pageSize) return;
+      try {
+        state = AsyncData(next);
+      } catch (_) {
+        // Ignore updates after disposal.
+      }
+    } catch (_) {
+      // Keep cached data if the network fetch fails.
+    }
+  }
+
+  Future<void> _refreshPageInBackground({required int pageIndex}) async {
+    final startState = state.valueOrNull;
+    if (startState == null) return;
+    if (startState.isLoadingPage) return;
+    if (pageIndex < 0) return;
+    if (pageIndex > startState.pageIndex) return;
+
+    try {
+      final refreshed = await _fetchPage(pageIndex: pageIndex);
+
+      final start = pageIndex * _pageSize;
+      final latest = state.valueOrNull;
+      if (latest == null) return;
+      if (latest.isLoadingPage) return;
+      if (start >= latest.products.length) return;
+
+      final before = latest.products.take(start).toList(growable: false);
+      final afterStart = start + refreshed.products.length;
+      final after = afterStart < latest.products.length
+          ? latest.products.sublist(afterStart)
+          : const <Product>[];
+
+      final merged = <Product>[...before, ...refreshed.products, ...after];
+
+      try {
+        state = AsyncData(
+          latest.copyWith(
+            products: merged,
+            totalCount: refreshed.totalCount,
+          ),
+        );
+      } catch (_) {
+        // Ignore updates after disposal.
+      }
+    } catch (_) {
+      // Keep cached data if the network fetch fails.
+    }
   }
 }
 

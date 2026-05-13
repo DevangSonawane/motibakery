@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
-import '../../../shared/config/supabase_config.dart';
 import '../../../shared/models/product.dart';
+import '../../../shared/utils/product_image_resolver.dart';
 import '../../orders/presentation/product_place_order_screen.dart';
 
 class ProductDetailArgs {
@@ -533,10 +534,13 @@ class ProductImageView extends StatelessWidget {
       return _fallback();
     }
 
-    return Image.network(
-      networkUrl,
+    return CachedNetworkImage(
+      imageUrl: networkUrl,
       fit: fit,
-      errorBuilder: (context, error, stackTrace) => _fallback(),
+      fadeInDuration: Duration.zero,
+      placeholderFadeInDuration: Duration.zero,
+      placeholder: (context, url) => Container(color: AppColors.surfaceGray),
+      errorWidget: (context, url, error) => _fallback(),
     );
   }
 
@@ -575,35 +579,7 @@ class ProductImageView extends StatelessWidget {
     }
   }
 
-  String? _resolveNetworkUrl(String value) {
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      return value;
-    }
-
-    if (value.startsWith('//')) {
-      return 'https:$value';
-    }
-
-    final supabaseUrl = SupabaseConfig.fromEnvironment().url.trim();
-    if (supabaseUrl.isEmpty) {
-      return null;
-    }
-
-    if (value.startsWith('/storage/v1/object/')) {
-      return '$supabaseUrl$value';
-    }
-
-    if (value.startsWith('storage/v1/object/')) {
-      return '$supabaseUrl/$value';
-    }
-
-    // Accept raw "bucket/path/to/file.jpg" and convert to public storage URL.
-    if (value.contains('/') && !value.contains(' ')) {
-      return '$supabaseUrl/storage/v1/object/public/$value';
-    }
-
-    return null;
-  }
+  String? _resolveNetworkUrl(String value) => resolveProductImageNetworkUrl(value);
 
   Widget _fallback() {
     return Container(
