@@ -13,30 +13,42 @@ class InventoryProductsState {
   const InventoryProductsState({
     required this.products,
     required this.totalCount,
-    required this.isLoadingMore,
-    required this.hasMore,
-    this.loadMoreError,
+    required this.pageIndex,
+    required this.pageSize,
+    required this.isLoadingPage,
+    this.pageError,
   });
 
   final List<Product> products;
   final int totalCount;
-  final bool isLoadingMore;
-  final bool hasMore;
-  final String? loadMoreError;
+  final int pageIndex;
+  final int pageSize;
+  final bool isLoadingPage;
+  final String? pageError;
+
+  int get totalPages {
+    if (totalCount <= 0) return 1;
+    return (totalCount / pageSize).ceil();
+  }
+
+  bool get hasPreviousPage => pageIndex > 0;
+  bool get hasNextPage => pageIndex + 1 < totalPages;
 
   InventoryProductsState copyWith({
     List<Product>? products,
     int? totalCount,
-    bool? isLoadingMore,
-    bool? hasMore,
-    String? loadMoreError,
+    int? pageIndex,
+    int? pageSize,
+    bool? isLoadingPage,
+    String? pageError,
   }) {
     return InventoryProductsState(
       products: products ?? this.products,
       totalCount: totalCount ?? this.totalCount,
-      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-      hasMore: hasMore ?? this.hasMore,
-      loadMoreError: loadMoreError,
+      pageIndex: pageIndex ?? this.pageIndex,
+      pageSize: pageSize ?? this.pageSize,
+      isLoadingPage: isLoadingPage ?? this.isLoadingPage,
+      pageError: pageError,
     );
   }
 }
@@ -48,29 +60,12 @@ final inventoryPagedProductsProvider =
 
 class InventoryPagedProductsNotifier
     extends AsyncNotifier<InventoryProductsState> {
-  static const int _pageSize = 60;
+  static const int _pageSize = 10;
 
   @override
   Future<InventoryProductsState> build() async {
-    final service = ref.read(productServiceProvider);
-    final first = await service.fetchProductsPageWithCount(
-      from: 0,
-      to: _pageSize - 1,
-    );
-
-    final products = first.data
-        .map((row) => Product.fromMap(row as Map<String, dynamic>))
-        .toList(growable: false);
-
-    final totalCount = first.count;
-    final hasMore = products.length < totalCount;
-
-    return InventoryProductsState(
-      products: products,
-      totalCount: totalCount,
-      isLoadingMore: false,
-      hasMore: hasMore,
-    );
+    final first = await _fetchPage(pageIndex: 0);
+    return first;
   }
 
   Future<void> refresh() async {
@@ -78,39 +73,65 @@ class InventoryPagedProductsNotifier
     state = await AsyncValue.guard(build);
   }
 
-  Future<void> loadMore() async {
+  Future<void> goToPage(int pageNumber) async {
     final current = state.valueOrNull;
     if (current == null) return;
-    if (current.isLoadingMore || !current.hasMore) return;
+    if (current.isLoadingPage) return;
 
-    state = AsyncData(current.copyWith(isLoadingMore: true, loadMoreError: null));
+    final pageIndex = pageNumber - 1;
+    if (pageIndex < 0) return;
+    if (pageIndex == current.pageIndex) return;
+    if (pageIndex >= current.totalPages) return;
+
+    state = AsyncData(
+      current.copyWith(isLoadingPage: true, pageError: null),
+    );
 
     try {
-      final offset = current.products.length;
-      final nextProducts = await ref.read(productServiceProvider).fetchProductsPage(
-            from: offset,
-            to: offset + _pageSize - 1,
-          );
-
-      final merged = <Product>[...current.products, ...nextProducts];
-      final hasMore = merged.length < current.totalCount;
-
-      state = AsyncData(
-        current.copyWith(
-          products: merged,
-          isLoadingMore: false,
-          hasMore: hasMore,
-          loadMoreError: null,
-        ),
-      );
+      final next = await _fetchPage(pageIndex: pageIndex);
+      state = AsyncData(next);
     } catch (error) {
       state = AsyncData(
         current.copyWith(
-          isLoadingMore: false,
-          loadMoreError: error.toString(),
+          isLoadingPage: false,
+          pageError: error.toString(),
         ),
       );
     }
+  }
+
+  Future<void> nextPage() async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    if (!current.hasNextPage) return;
+    await goToPage(current.pageIndex + 2);
+  }
+
+  Future<void> previousPage() async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    if (!current.hasPreviousPage) return;
+    await goToPage(current.pageIndex);
+  }
+
+  Future<InventoryProductsState> _fetchPage({required int pageIndex}) async {
+    final service = ref.read(productServiceProvider);
+
+    final from = pageIndex * _pageSize;
+    final to = from + _pageSize - 1;
+
+    final response = await service.fetchProductsPageWithCount(from: from, to: to);
+    final products = response.data
+        .map((row) => Product.fromMap(row as Map<String, dynamic>))
+        .toList(growable: false);
+
+    return InventoryProductsState(
+      products: products,
+      totalCount: response.count,
+      pageIndex: pageIndex,
+      pageSize: _pageSize,
+      isLoadingPage: false,
+    );
   }
 }
 

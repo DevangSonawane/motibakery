@@ -20,31 +20,6 @@ class CounterHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
-  late final ScrollController _scrollController;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController()..addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController
-      ..removeListener(_onScroll)
-      ..dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    if (position.extentAfter > 600) return;
-
-    final notifier = ref.read(inventoryPagedProductsProvider.notifier);
-    notifier.loadMore();
-  }
-
   @override
   Widget build(BuildContext context) {
     final productsState = ref.watch(inventoryPagedProductsProvider);
@@ -54,8 +29,10 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
 
     final loadedCount = productsState.valueOrNull?.products.length ?? 0;
     final totalCount = productsState.valueOrNull?.totalCount;
-    final loadingMore = productsState.valueOrNull?.isLoadingMore ?? false;
-    final loadMoreError = productsState.valueOrNull?.loadMoreError;
+    final pageIndex = productsState.valueOrNull?.pageIndex ?? 0;
+    final totalPages = productsState.valueOrNull?.totalPages ?? 1;
+    final isLoadingPage = productsState.valueOrNull?.isLoadingPage ?? false;
+    final pageError = productsState.valueOrNull?.pageError;
 
     return Scaffold(
       appBar: AppBar(
@@ -90,7 +67,6 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
           await ref.read(inventoryPagedProductsProvider.notifier).refresh();
         },
         child: CustomScrollView(
-          controller: _scrollController,
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -113,11 +89,15 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
                     Text(
                       totalCount == null
                           ? 'Loaded $loadedCount cakes'
-                          : 'Loaded $loadedCount of $totalCount cakes',
+                          : 'Page ${pageIndex + 1} of $totalPages • Showing $loadedCount of $totalCount cakes',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppColors.textSecondary,
                           ),
                     ),
+                    if (isLoadingPage) ...[
+                      const SizedBox(height: 10),
+                      const LinearProgressIndicator(minHeight: 3),
+                    ],
                     const SizedBox(height: 12),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -227,27 +207,36 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
                 );
               },
             ),
-            if (loadingMore)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              )
-            else if (loadMoreError != null)
+            if (pageError != null)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   child: Text(
-                    'Unable to load more: $loadMoreError',
+                    'Unable to load page: $pageError',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.redAccent,
                         ),
                   ),
                 ),
-              )
-            else
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                child: _PaginationBar(
+                  currentPage: pageIndex + 1,
+                  totalPages: totalPages,
+                  isLoading: isLoadingPage,
+                  onPageSelected: (page) => ref
+                      .read(inventoryPagedProductsProvider.notifier)
+                      .goToPage(page),
+                  onNext: () =>
+                      ref.read(inventoryPagedProductsProvider.notifier).nextPage(),
+                  onPrevious: () => ref
+                      .read(inventoryPagedProductsProvider.notifier)
+                      .previousPage(),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -425,4 +414,114 @@ class _InventoryCard extends StatelessWidget {
         );
   }
 
+}
+
+class _PaginationBar extends StatelessWidget {
+  const _PaginationBar({
+    required this.currentPage,
+    required this.totalPages,
+    required this.isLoading,
+    required this.onPageSelected,
+    required this.onNext,
+    required this.onPrevious,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final bool isLoading;
+  final ValueChanged<int> onPageSelected;
+  final VoidCallback onNext;
+  final VoidCallback onPrevious;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxButtons = totalPages < 4 ? totalPages : 4;
+
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'Previous page',
+          onPressed: currentPage > 1 && !isLoading ? onPrevious : null,
+          icon: const Icon(Icons.chevron_left),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (var page = 1; page <= maxButtons; page++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _PageButton(
+                      page: page,
+                      selected: page == currentPage,
+                      onTap: isLoading ? null : () => onPageSelected(page),
+                    ),
+                  ),
+                if (totalPages > 4) ...[
+                  const Text('...'),
+                  const SizedBox(width: 8),
+                  _PageButton(
+                    page: totalPages,
+                    selected: totalPages == currentPage,
+                    onTap: isLoading ? null : () => onPageSelected(totalPages),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (isLoading)
+          const SizedBox(
+            height: 18,
+            width: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        IconButton(
+          tooltip: 'Next page',
+          onPressed: currentPage < totalPages && !isLoading ? onNext : null,
+          icon: const Icon(Icons.chevron_right),
+        ),
+      ],
+    );
+  }
+}
+
+class _PageButton extends StatelessWidget {
+  const _PageButton({
+    required this.page,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int page;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Ink(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: selected ? null : Border.all(color: AppColors.borderLight),
+        ),
+        child: Center(
+          child: Text(
+            '$page',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: selected ? Colors.white : colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
 }
