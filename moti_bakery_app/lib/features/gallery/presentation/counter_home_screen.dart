@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
@@ -107,7 +106,9 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
         },
         child: CustomScrollView(
           controller: _scrollController,
-          cacheExtent: 2000,
+          // Too-large cacheExtent forces lots of offscreen build/layout/image
+          // decode work while flinging. Keep it moderate for smoother scroll.
+          cacheExtent: 1200,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
@@ -230,12 +231,16 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
                           (context, index) {
                             final product = filteredProducts[index];
                             return _InventoryCard(
+                              key: ValueKey(product.id),
                               product: product,
                               products: filteredProducts,
                               index: index,
                             );
                           },
                           childCount: filteredProducts.length,
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          addSemanticIndexes: false,
                         ),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
@@ -284,6 +289,10 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
     if (products == null || products.isEmpty) return;
 
     final signature = products
+        // Prefetch newly appended items, not just the first page.
+        // Using the tail avoids a bug where prefetch never re-runs after
+        // pagination because the first items stay the same.
+        .reversed
         .take(12)
         .map((product) => product.image.trim())
         .where((value) => value.isNotEmpty)
@@ -301,21 +310,37 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
 
   Future<void> _prefetchImages(BuildContext context, List<Product> products) async {
     final candidates = <String>[];
-    for (final product in products.take(12)) {
+    for (final product in products.reversed.take(12)) {
       final url = resolveProductImageNetworkUrl(product.image);
       if (url == null) continue;
       if (_prefetchedImageUrls.contains(url)) continue;
       candidates.add(url);
     }
 
-    for (final url in candidates) {
-      _prefetchedImageUrls.add(url);
-      try {
-        await precacheImage(CachedNetworkImageProvider(url), context);
-      } catch (_) {
-        // Best-effort prefetch; ignore failures.
+    // Prefetch concurrently (bounded) so slow connections don't serialize each
+    // image fetch and block the whole prefetch window.
+    if (candidates.isEmpty) return;
+    var nextIndex = 0;
+    // Keep this low to avoid competing with scrolling/decoding work.
+    final workerCount = candidates.length < 2 ? candidates.length : 2;
+
+    Future<void> worker() async {
+      while (mounted) {
+        final current = nextIndex;
+        if (current >= candidates.length) return;
+        nextIndex = current + 1;
+
+        final url = candidates[current];
+        _prefetchedImageUrls.add(url);
+        try {
+          await precacheImage(CachedNetworkImageProvider(url), context);
+        } catch (_) {
+          // Best-effort prefetch; ignore failures.
+        }
       }
     }
+
+    await Future.wait(List<Future<void>>.generate(workerCount, (_) => worker()));
   }
 
   Widget _buildLoading() {
@@ -337,7 +362,7 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
             return Shimmer.fromColors(
               baseColor: AppColors.surfaceGray,
               highlightColor: AppColors.borderLight,
-              period: 1200.ms,
+              period: const Duration(milliseconds: 1200),
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
@@ -399,6 +424,7 @@ class _FilterChip extends StatelessWidget {
 
 class _InventoryCard extends StatelessWidget {
   const _InventoryCard({
+    super.key,
     required this.product,
     required this.products,
     required this.index,
@@ -412,81 +438,109 @@ class _InventoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // Only show product name; no category or variant detail.
 
-    return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => context.push(
-              '/product-detail',
-              extra: ProductDetailArgs(products: products, initialIndex: index),
-            ),
-              child: Ink(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primaryPale,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 7,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ProductImageView(
-                            imagePath: product.image,
-                            productName: product.displayTitle,
-                          ),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withValues(alpha: 0.26),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push(
+        '/product-detail',
+        extra: ProductDetailArgs(products: products, initialIndex: index),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.primaryPale,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 7,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.hardEdge,
+                child: Container(
+                  foregroundDecoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.26),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    product.displayTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      height: 1.2,
-                    ),
+                  child: _ProductThumbnailView(
+                    imagePath: product.image,
+                    fit: BoxFit.cover,
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        )
-        .animate(delay: Duration(milliseconds: 40 * index))
-        .fadeIn(duration: 280.ms)
-        .slideY(
-          begin: 0.12,
-          end: 0,
-          duration: 280.ms,
-          curve: Curves.easeOutCubic,
-        )
-        .scale(
-          begin: const Offset(0.98, 0.98),
-          end: const Offset(1, 1),
-          duration: 280.ms,
-          curve: Curves.easeOutBack,
-        );
+            const SizedBox(height: 10),
+            Text(
+              product.displayTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
+}
+
+class _ProductThumbnailView extends StatelessWidget {
+  const _ProductThumbnailView({
+    required this.imagePath,
+    required this.fit,
+  });
+
+  final String imagePath;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = resolveProductImageNetworkUrl(imagePath);
+    if (url == null) {
+      return const ColoredBox(color: AppColors.surfaceGray);
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final cacheWidth = constraints.hasBoundedWidth && constraints.maxWidth.isFinite
+            ? (constraints.maxWidth * dpr).round().clamp(1, 1200)
+            : null;
+        final cacheHeight =
+            constraints.hasBoundedHeight && constraints.maxHeight.isFinite
+                ? (constraints.maxHeight * dpr).round().clamp(1, 1200)
+                : null;
+
+        final baseProvider = CachedNetworkImageProvider(url);
+        final ImageProvider provider = (cacheWidth != null || cacheHeight != null)
+            ? ResizeImage(baseProvider, width: cacheWidth, height: cacheHeight)
+            : baseProvider;
+
+        return Image(
+          image: provider,
+          fit: fit,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.none,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame != null) return child;
+            return const ColoredBox(color: AppColors.surfaceGray);
+          },
+          errorBuilder: (context, error, stackTrace) =>
+              const ColoredBox(color: AppColors.surfaceGray),
+        );
+      },
+    );
+  }
 }

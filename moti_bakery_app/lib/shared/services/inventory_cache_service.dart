@@ -18,11 +18,11 @@ class InventoryCachePayload {
 
 class InventoryCacheService {
   static String _productsKey(int pageIndex) =>
-      'inventory_cache_v1_products_page_$pageIndex';
+      'inventory_cache_v2_products_page_$pageIndex';
   static String _totalCountKey(int pageIndex) =>
-      'inventory_cache_v1_total_count_page_$pageIndex';
+      'inventory_cache_v2_total_count_page_$pageIndex';
   static String _savedAtKey(int pageIndex) =>
-      'inventory_cache_v1_saved_at_ms_page_$pageIndex';
+      'inventory_cache_v2_saved_at_ms_page_$pageIndex';
 
   static const Duration maxAge = Duration(hours: 12);
 

@@ -534,13 +534,46 @@ class ProductImageView extends StatelessWidget {
       return _fallback();
     }
 
-    return CachedNetworkImage(
-      imageUrl: networkUrl,
-      fit: fit,
-      fadeInDuration: Duration.zero,
-      placeholderFadeInDuration: Duration.zero,
-      placeholder: (context, url) => Container(color: AppColors.surfaceGray),
-      errorWidget: (context, url, error) => _fallback(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+
+        int? memCacheWidth;
+        int? memCacheHeight;
+        int? maxWidthDiskCache;
+        int? maxHeightDiskCache;
+
+        if (constraints.hasBoundedWidth && constraints.maxWidth.isFinite) {
+          final target = (constraints.maxWidth * dpr).round().clamp(1, 1400);
+          memCacheWidth = target;
+          maxWidthDiskCache = target;
+        }
+        if (constraints.hasBoundedHeight && constraints.maxHeight.isFinite) {
+          final target = (constraints.maxHeight * dpr).round().clamp(1, 1400);
+          memCacheHeight = target;
+          maxHeightDiskCache = target;
+        }
+
+        return CachedNetworkImage(
+          imageUrl: networkUrl,
+          fit: fit,
+          useOldImageOnUrlChange: true,
+          imageBuilder: (context, provider) => Image(
+            image: provider,
+            fit: fit,
+            filterQuality: FilterQuality.low,
+            gaplessPlayback: true,
+          ),
+          memCacheWidth: memCacheWidth,
+          memCacheHeight: memCacheHeight,
+          maxWidthDiskCache: maxWidthDiskCache,
+          maxHeightDiskCache: maxHeightDiskCache,
+          fadeInDuration: Duration.zero,
+          placeholderFadeInDuration: Duration.zero,
+          placeholder: (context, url) => Container(color: AppColors.surfaceGray),
+          errorWidget: (context, url, error) => _fallback(),
+        );
+      },
     );
   }
 

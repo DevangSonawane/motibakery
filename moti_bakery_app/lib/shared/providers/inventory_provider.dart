@@ -65,7 +65,9 @@ final inventoryPagedProductsProvider =
 
 class InventoryPagedProductsNotifier
     extends AsyncNotifier<InventoryProductsState> {
-  static const int _pageSize = 10;
+  // Larger pages reduce "hard stop" feeling and the number of network roundtrips
+  // while scrolling.
+  static const int _pageSize = 20;
 
   @override
   Future<InventoryProductsState> build() async {

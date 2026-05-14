@@ -7,6 +7,11 @@ import 'shared/services/supabase_bootstrap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Reduce image "vanishing" on scroll by allowing a larger in-memory image
+  // cache. Combined with sized decoding in ProductImageView, this keeps cards
+  // stable while scrolling through many products.
+  PaintingBinding.instance.imageCache.maximumSize = 2000;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 150 << 20; // 150 MiB
   await SupabaseBootstrap.initialize();
   SupabaseBootstrap.logStatus();
   runApp(const ProviderScope(child: MotiBakeryApp()));
