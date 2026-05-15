@@ -134,6 +134,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Text(
           product.displayTitle,
           maxLines: 1,
@@ -165,28 +166,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const SizedBox(height: 18),
             Text(
               product.displayTitle,
+              textAlign: TextAlign.center,
               style: Theme.of(
                 context,
               ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _InfoChip(
-                  label: product.category.trim().isEmpty
-                      ? 'Product'
-                      : product.category,
-                ),
-              ],
-            ),
             const SizedBox(height: 14),
-            Text(
-              selectedPrice,
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
+            Center(
+              child: Text(
+                selectedPrice,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -437,33 +430,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.primaryPale,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class ProductImageView extends StatelessWidget {
   const ProductImageView({
     super.key,
@@ -557,6 +523,7 @@ class ProductImageView extends StatelessWidget {
           maxWidthDiskCache: maxWidthDiskCache,
           maxHeightDiskCache: maxHeightDiskCache,
           fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
           placeholderFadeInDuration: Duration.zero,
           placeholder: (context, url) =>
               Container(color: AppColors.surfaceGray),
