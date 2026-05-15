@@ -134,7 +134,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(product.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          product.displayTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: GestureDetector(
         onHorizontalDragEnd: _handleHorizontalDragEnd,
@@ -171,34 +175,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               runSpacing: 8,
               children: [
                 _InfoChip(
-                  label: product.category.trim().isEmpty ? 'Product' : product.category,
+                  label: product.category.trim().isEmpty
+                      ? 'Product'
+                      : product.category,
                 ),
               ],
             ),
             const SizedBox(height: 14),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.18),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: Text(
-                key: ValueKey<String>('price_${selectedVariant ?? 'base'}_${product.id}'),
-                selectedPrice,
-                style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                ),
+            Text(
+              selectedPrice,
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 20),
-            Text('Select Variant', style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              'Select Variant',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             const SizedBox(height: 10),
             if (_variants.isEmpty)
               Text(
@@ -236,72 +231,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 alignment: Alignment.centerLeft,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 320),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0.96, end: 1),
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, scale, child) {
-                      return Transform.scale(scale: scale, child: child);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.primary.withValues(alpha: 0.18),
-                            AppColors.primaryLight.withValues(alpha: 0.1),
-                          ],
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.18),
+                          AppColors.primaryLight.withValues(alpha: 0.1),
+                        ],
+                      ),
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedVariant,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(14),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Variant',
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                       ),
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedVariant,
-                        isExpanded: true,
-                        borderRadius: BorderRadius.circular(14),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                        decoration: InputDecoration(
-                          labelText: 'Variant',
-                          isDense: true,
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        items: _variants
-                            .map(
-                              (variant) => DropdownMenuItem<String>(
-                                value: variant,
-                                child: Text(
-                                  '${_variantLabel(variant, product)} • ${_priceForVariant(product, variant)}',
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
+                      items: _variants
+                          .map(
+                            (variant) => DropdownMenuItem<String>(
+                              value: variant,
+                              child: Text(
+                                '${_variantLabel(variant, product)} • ${_priceForVariant(product, variant)}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
-                            )
-                            .toList(growable: false),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _selectedVariant = value);
-                          }
-                        },
-                      ),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedVariant = value);
+                        }
+                      },
                     ),
                   ),
                 ),
@@ -570,7 +558,8 @@ class ProductImageView extends StatelessWidget {
           maxHeightDiskCache: maxHeightDiskCache,
           fadeInDuration: Duration.zero,
           placeholderFadeInDuration: Duration.zero,
-          placeholder: (context, url) => Container(color: AppColors.surfaceGray),
+          placeholder: (context, url) =>
+              Container(color: AppColors.surfaceGray),
           errorWidget: (context, url, error) => _fallback(),
         );
       },
@@ -612,7 +601,8 @@ class ProductImageView extends StatelessWidget {
     }
   }
 
-  String? _resolveNetworkUrl(String value) => resolveProductImageNetworkUrl(value);
+  String? _resolveNetworkUrl(String value) =>
+      resolveProductImageNetworkUrl(value);
 
   Widget _fallback() {
     return Container(
