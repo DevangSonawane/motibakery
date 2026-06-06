@@ -62,8 +62,9 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
   Widget build(BuildContext context) {
     final productsState = ref.watch(inventoryPagedProductsProvider);
     final filteredProducts = ref.watch(filteredInventoryProductsProvider);
-    final categories = ref.watch(inventoryCategoriesProvider);
-    final selectedCategory = ref.watch(selectedInventoryCategoryProvider);
+    final allProductsState = ref.watch(inventoryAllProductsProvider);
+    final flavours = ref.watch(inventoryFlavoursProvider);
+    final selectedFlavour = ref.watch(selectedInventoryFlavourProvider);
 
     final loadedCount = productsState.valueOrNull?.products.length ?? 0;
     final totalCount = productsState.valueOrNull?.totalCount;
@@ -95,7 +96,21 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
             ],
           ),
         ),
-        actions: const [CounterLogoutButton()],
+        actions: [
+          IconButton(
+            tooltip: 'Filter by flavour',
+            onPressed: allProductsState.isLoading || flavours.isEmpty
+                ? null
+                : () => _showFlavourFilterSheet(context, flavours),
+            icon: Icon(
+              selectedFlavour == null
+                  ? Icons.filter_alt_outlined
+                  : Icons.filter_alt,
+            ),
+            color: selectedFlavour == null ? null : AppColors.primary,
+          ),
+          const CounterLogoutButton(),
+        ],
       ),
       bottomNavigationBar: const CounterBottomNav(currentIndex: 0),
       body: RefreshIndicator(
@@ -141,35 +156,6 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
                       const SizedBox(height: 10),
                       const LinearProgressIndicator(minHeight: 3),
                     ],
-                    const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _FilterChip(
-                            label: 'All',
-                            selected: selectedCategory == null,
-                            onTap: () => ref
-                                .read(
-                                  selectedInventoryCategoryProvider.notifier,
-                                )
-                                .state = null,
-                          ),
-                          for (final category in categories)
-                            _FilterChip(
-                              label: category,
-                              selected: selectedCategory == category,
-                              onTap: () {
-                                ref
-                                    .read(
-                                      selectedInventoryCategoryProvider.notifier,
-                                    )
-                                    .state = category;
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -383,42 +369,82 @@ class _CounterHomeScreenState extends ConsumerState<CounterHomeScreen> {
     }
     return error.toString();
   }
-}
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primary : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: selected ? null : Border.all(color: AppColors.borderLight),
-          ),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: selected ? Colors.white : AppColors.textSecondary,
+  Future<void> _showFlavourFilterSheet(
+    BuildContext context,
+    List<String> flavours,
+  ) async {
+    final current = ref.read(selectedInventoryFlavourProvider);
+    final next = await showModalBottomSheet<String?>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final maxHeight = MediaQuery.sizeOf(context).height * 0.7;
+        return SafeArea(
+          child: SizedBox(
+            height: maxHeight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Filter by flavour',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pick one flavour to narrow the cakes shown below.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('All'),
+                            selected: current == null,
+                            onSelected: (_) => Navigator.of(context).pop(null),
+                          ),
+                          for (final flavour in flavours)
+                            ChoiceChip(
+                              label: Text(flavour),
+                              selected: flavour.toLowerCase() == current?.toLowerCase(),
+                              onSelected: (_) => Navigator.of(context).pop(flavour),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: current == null
+                          ? null
+                          : () => Navigator.of(context).pop(null),
+                      child: const Text('Clear filter'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+
+    if (!mounted) return;
+    ref.read(selectedInventoryFlavourProvider.notifier).state = next;
   }
 }
 

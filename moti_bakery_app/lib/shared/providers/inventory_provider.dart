@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/product.dart';
 import '../services/inventory_cache_service.dart';
 import '../services/product_service.dart';
+import '../utils/flavour_normalizer.dart';
 
 final productServiceProvider = Provider<ProductService>((ref) => ProductService());
 final inventoryCacheServiceProvider =
@@ -13,6 +14,11 @@ final inventoryCacheServiceProvider =
 final inventorySearchQueryProvider = StateProvider<String>((ref) => '');
 
 final selectedInventoryCategoryProvider = StateProvider<String?>((ref) => null);
+final selectedInventoryFlavourProvider = StateProvider<String?>((ref) => null);
+
+final inventoryAllProductsProvider = FutureProvider<List<Product>>((ref) async {
+  return ref.read(productServiceProvider).fetchAllProducts();
+});
 
 class InventoryProductsState {
   const InventoryProductsState({
@@ -249,11 +255,16 @@ final inventoryCategoriesProvider = Provider<List<String>>((ref) {
 });
 
 final filteredInventoryProductsProvider = Provider<List<Product>>((ref) {
-  final products =
+  final pagedProducts =
       ref.watch(inventoryPagedProductsProvider).valueOrNull?.products ??
           const <Product>[];
+  final allProducts = ref.watch(inventoryAllProductsProvider).valueOrNull;
   final query = ref.watch(inventorySearchQueryProvider).trim().toLowerCase();
   final selectedCategory = ref.watch(selectedInventoryCategoryProvider);
+  final selectedFlavour = ref.watch(selectedInventoryFlavourProvider);
+  final products = selectedFlavour == null
+      ? pagedProducts
+      : allProducts ?? pagedProducts;
 
   return products.where((product) {
     final matchesQuery = query.isEmpty ||
@@ -261,8 +272,31 @@ final filteredInventoryProductsProvider = Provider<List<Product>>((ref) {
         product.handle.toLowerCase().contains(query);
     final matchesCategory =
         selectedCategory == null || product.category == selectedCategory;
-    return matchesQuery && matchesCategory;
+    final matchesFlavour = selectedFlavour == null ||
+        product.optionValues.any(
+          (value) => flavourKey(value) == flavourKey(selectedFlavour),
+        );
+    return matchesQuery && matchesCategory && matchesFlavour;
   }).toList(growable: false);
+});
+
+final inventoryFlavoursProvider = Provider<List<String>>((ref) {
+  final products =
+      ref.watch(inventoryAllProductsProvider).valueOrNull ?? const <Product>[];
+  final flavours = <String>{};
+
+  for (final product in products) {
+    for (final flavour in product.optionValues) {
+      final trimmed = normalizeFlavourName(flavour);
+      if (trimmed.isNotEmpty) {
+        flavours.add(trimmed);
+      }
+    }
+  }
+
+  final list = flavours.toList();
+  list.sort();
+  return list;
 });
 
 final selectedProductValueProvider =

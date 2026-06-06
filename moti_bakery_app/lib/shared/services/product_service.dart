@@ -6,6 +6,7 @@ import 'supabase_bootstrap.dart';
 class ProductService {
   static const String _columns =
       'id,handle,title,option1_name,option1_value,option2_name,option2_value,option3_name,option3_value,name,category,rate,weight,min_weight,max_weight,flavours,status,image,created_at,updated_at';
+  static const int _allProductsPageSize = 250;
 
   void clearCache() {
     // Intentionally a no-op for now. Caching is handled at the provider layer
@@ -28,6 +29,45 @@ class ProductService {
           .limit(limit)
           .order('created_at', ascending: false);
       return rows.map(Product.fromMap).toList(growable: false);
+    } on PostgrestException catch (error) {
+      throw ProductException(error.message);
+    } on AuthException catch (error) {
+      throw ProductException(error.message);
+    } catch (error) {
+      throw ProductException(error.toString());
+    }
+  }
+
+  Future<List<Product>> fetchAllProducts() async {
+    if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
+      throw const ProductException(
+        'Supabase is not connected. Run app with --dart-define SUPABASE_URL and SUPABASE_ANON_KEY, then login with a valid Supabase user.',
+      );
+    }
+
+    try {
+      final products = <Product>[];
+      var from = 0;
+
+      while (true) {
+        final rows = await Supabase.instance.client
+            .from('products')
+            .select(_columns)
+            .eq('status', 'active')
+            .order('created_at', ascending: false)
+            .range(from, from + _allProductsPageSize - 1);
+
+        final batch = rows.map(Product.fromMap).toList(growable: false);
+        products.addAll(batch);
+
+        if (batch.length < _allProductsPageSize) {
+          break;
+        }
+
+        from += _allProductsPageSize;
+      }
+
+      return products;
     } on PostgrestException catch (error) {
       throw ProductException(error.message);
     } on AuthException catch (error) {

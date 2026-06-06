@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../utils/flavour_normalizer.dart';
+
 class Product {
   const Product({
     required this.id,
@@ -187,13 +189,13 @@ class Product {
             final picked = name == '__custom__' ? customName : name;
             final trimmed = picked.trim();
             if (trimmed.isNotEmpty) {
-              options.add(trimmed);
+              options.addAll(extractFlavourNames(trimmed));
             }
             continue;
           }
           final value = _extractValue(item);
           if (value != null && value.trim().isNotEmpty) {
-            options.add(value.trim());
+            options.addAll(extractFlavourNames(value.trim()));
           }
         }
         return options;
@@ -203,13 +205,9 @@ class Product {
         // `[{name: Pineapple, price: 700.00, customName: }, ...]`.
         final extracted = _extractNamesFromLooseObjectString(raw);
         if (extracted.isNotEmpty) {
-          return extracted;
+          return extracted.expand(extractFlavourNames).toList(growable: false);
         }
-        return raw
-            .split(RegExp(r'[,\n|]+'))
-            .map((value) => value.trim())
-            .where((value) => value.isNotEmpty)
-            .toList(growable: false);
+        return extractFlavourNames(raw);
       }
     }
 
@@ -220,18 +218,21 @@ class Product {
       }
       final parsed = _tryParseOptionValues(normalized);
       if (parsed.isNotEmpty) {
-        values.addAll(parsed);
+        for (final item in parsed) {
+          values.addAll(extractFlavourNames(item));
+        }
         return;
       }
       final extracted = _extractNamesFromLooseObjectString(normalized);
       if (extracted.isNotEmpty) {
-        values.addAll(extracted);
+        for (final item in extracted) {
+          values.addAll(extractFlavourNames(item));
+        }
         return;
       }
-      for (final part in normalized.split(RegExp(r'[,\n|]+'))) {
-        final next = part.trim();
-        if (next.isNotEmpty) {
-          values.add(next);
+      for (final item in extractFlavourNames(normalized)) {
+        if (item.trim().isNotEmpty) {
+          values.add(item.trim());
         }
       }
     }
@@ -264,13 +265,13 @@ class Product {
           final picked = name == '__custom__' ? customName : name;
           final trimmed = picked.trim();
           if (trimmed.isNotEmpty) {
-            results.add(trimmed);
+            results.addAll(extractFlavourNames(trimmed));
           }
           continue;
         }
         final value = _extractValue(item);
         if (value != null && value.trim().isNotEmpty) {
-          results.add(value.trim());
+          results.addAll(extractFlavourNames(value.trim()));
         }
       }
       return results;
@@ -282,12 +283,12 @@ class Product {
       }
       final value = _labelFromMap(data);
       if (value != null && value.trim().isNotEmpty) {
-        results.add(value.trim());
+        results.addAll(extractFlavourNames(value.trim()));
       }
       return results;
     }
     if (data is String && data.trim().isNotEmpty) {
-      results.add(data.trim());
+      results.addAll(extractFlavourNames(data.trim()));
     }
     return results;
   }
