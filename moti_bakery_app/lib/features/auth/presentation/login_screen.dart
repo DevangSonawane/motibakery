@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/theme.dart';
 import '../../../shared/providers/auth_provider.dart';
@@ -17,16 +18,51 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  static const _rememberedEmailKey = 'remembered_login_email';
+
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'aniketjha@gmail.com');
-  final _passwordController = TextEditingController(text: '12345678');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _rememberMe = true;
   bool _obscurePassword = true;
+  bool _loadedRememberedEmail = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadRememberedEmail());
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberedEmail = prefs.getString(_rememberedEmailKey) ?? '';
+    if (!mounted) {
+      return;
+    }
+
+    if (rememberedEmail.isNotEmpty) {
+      _emailController.text = rememberedEmail;
+      _rememberMe = true;
+    }
+
+    setState(() => _loadedRememberedEmail = true);
+  }
+
+  Future<void> _persistRememberedEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe && email.trim().isNotEmpty) {
+      await prefs.setString(_rememberedEmailKey, email.trim());
+      return;
+    }
+
+    await prefs.remove(_rememberedEmailKey);
   }
 
   Future<void> _submit() async {
@@ -36,9 +72,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final authController = ref.read(authControllerProvider);
     await authController.login(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
+      email: _emailController.text,
+      password: _passwordController.text,
+    );
+    if (authController.state.user != null) {
+      await _persistRememberedEmail(_emailController.text);
+    }
     if (!mounted) {
       return;
     }
@@ -67,14 +106,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: <Widget>[
                     const SizedBox(height: 24),
                     Image.asset(
-                      'assets/images/images-3.png',
-                      height: 80,
-                      fit: BoxFit.contain,
-                    ).animate().fadeIn(duration: 300.ms).slideY(
-                      begin: 0.25,
-                      end: 0,
-                      duration: 300.ms,
-                    ),
+                          'assets/images/images-3.png',
+                          height: 80,
+                          fit: BoxFit.contain,
+                        )
+                        .animate()
+                        .fadeIn(duration: 300.ms)
+                        .slideY(begin: 0.25, end: 0, duration: 300.ms),
                     const SizedBox(height: 12),
                     RichText(
                       textAlign: TextAlign.center,
@@ -127,7 +165,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
                           },
                           icon: Icon(
                             _obscurePassword
@@ -136,16 +176,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ),
                       ),
-                      validator: (value) => Validators.requiredField(
-                        value,
-                        label: 'Password',
-                      ),
+                      validator: (value) =>
+                          Validators.requiredField(value, label: 'Password'),
                     ).animate().fadeIn(delay: 250.ms, duration: 250.ms),
+                    const SizedBox(height: 6),
+                    AnimatedOpacity(
+                      opacity: _loadedRememberedEmail ? 1 : 0,
+                      duration: 150.ms,
+                      child: CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: _rememberMe,
+                        onChanged: (value) {
+                          setState(() => _rememberMe = value ?? false);
+                          if (value == false) {
+                            unawaited(_persistRememberedEmail(''));
+                          }
+                        },
+                        title: Text(
+                          'Remember my email',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'We only store the email on this device.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ).animate().fadeIn(delay: 300.ms, duration: 200.ms),
                     if (authState.error != null) ...<Widget>[
                       const SizedBox(height: 10),
                       Text(
                         authState.error!,
-                        style: const TextStyle(color: AppColors.error, fontSize: 12),
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),

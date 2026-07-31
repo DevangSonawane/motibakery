@@ -4,13 +4,17 @@ import '../models/app_user.dart';
 import 'supabase_bootstrap.dart';
 
 class AuthService {
-  Future<AppUser> login({required String email, required String password}) async {
+  Future<AppUser> login({
+    required String email,
+    required String password,
+  }) async {
     final normalized = email.trim().toLowerCase();
 
     if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
       if (SupabaseBootstrap.result.status == SupabaseBootstrapStatus.failed) {
         throw AuthException(
-          'Supabase connection failed. ${SupabaseBootstrap.result.message ?? ''}'.trim(),
+          'Supabase connection failed. ${SupabaseBootstrap.result.message ?? ''}'
+              .trim(),
         );
       }
       throw AuthException(
@@ -19,6 +23,20 @@ class AuthService {
     }
 
     return _loginViaSupabase(email: normalized, password: password);
+  }
+
+  Future<AppUser?> restoreSession() async {
+    if (SupabaseBootstrap.result.status != SupabaseBootstrapStatus.connected) {
+      return null;
+    }
+
+    final session = Supabase.instance.client.auth.currentSession;
+    final authUser = session?.user;
+    if (authUser == null) {
+      return null;
+    }
+
+    return _buildAppUser(authUser, fallbackEmail: authUser.email ?? '');
   }
 
   Future<void> logout() async {
@@ -35,40 +53,22 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final authResponse = await Supabase.instance.client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      final authResponse = await Supabase.instance.client.auth
+          .signInWithPassword(email: email, password: password);
       final authUser = authResponse.user;
       if (authUser == null) {
         throw const AuthException('Invalid email or password');
       }
 
-      final data = await Supabase.instance.client
-          .from('users')
-          .select('uid, full_name, gmail, role')
-          .eq('uid', authUser.id)
-          .maybeSingle();
-
-      final role = _mapRole(
-        data is Map<String, dynamic> ? data['role']?.toString() : null,
-      );
-      final displayName = (data is Map<String, dynamic> &&
-              (data['full_name']?.toString().trim().isNotEmpty ?? false))
-          ? data['full_name'].toString().trim()
-          : email.split('@').first;
-      return AppUser(
-        id: authUser.id,
-        email: authUser.email ?? email,
-        role: role,
-        displayName: displayName,
-      );
+      return _buildAppUser(authUser, fallbackEmail: email);
     } on AuthException {
       rethrow;
     } on AuthApiException catch (error) {
       final message = error.message.trim();
       if (message.isEmpty) {
-        throw const AuthException('Unable to login. Please verify your credentials.');
+        throw const AuthException(
+          'Unable to login. Please verify your credentials.',
+        );
       }
       throw AuthException(message);
     } on PostgrestException catch (error) {
@@ -76,6 +76,32 @@ class AuthService {
     } catch (_) {
       throw const AuthException('Unable to login. Please try again.');
     }
+  }
+
+  Future<AppUser> _buildAppUser(
+    User authUser, {
+    required String fallbackEmail,
+  }) async {
+    final data = await Supabase.instance.client
+        .from('users')
+        .select('uid, full_name, gmail, role')
+        .eq('uid', authUser.id)
+        .maybeSingle();
+
+    final role = _mapRole(
+      data is Map<String, dynamic> ? data['role']?.toString() : null,
+    );
+    final displayName =
+        (data is Map<String, dynamic> &&
+            (data['full_name']?.toString().trim().isNotEmpty ?? false))
+        ? data['full_name'].toString().trim()
+        : fallbackEmail.split('@').first;
+    return AppUser(
+      id: authUser.id,
+      email: authUser.email ?? fallbackEmail,
+      role: role,
+      displayName: displayName,
+    );
   }
 
   UserRole _mapRole(String? roleValue) {
@@ -90,7 +116,6 @@ class AuthService {
         );
     }
   }
-
 }
 
 class AuthException implements Exception {

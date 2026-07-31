@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
@@ -23,9 +26,13 @@ class AuthState {
 }
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._authService);
+  AuthController(this._authService) {
+    _hydrateSession();
+    _listenToAuthChanges();
+  }
 
   final AuthService _authService;
+  StreamSubscription<supabase.AuthState>? _authSubscription;
   AuthState _state = const AuthState();
 
   AuthState get state => _state;
@@ -50,6 +57,51 @@ class AuthController extends ChangeNotifier {
     await _authService.logout();
     _state = const AuthState();
     notifyListeners();
+  }
+
+  Future<void> _hydrateSession() async {
+    _state = _state.copyWith(isLoading: true, error: null);
+    notifyListeners();
+
+    try {
+      final user = await _authService.restoreSession();
+      _state = AuthState(user: user, isLoading: false, error: null);
+    } catch (_) {
+      _state = const AuthState();
+    }
+
+    notifyListeners();
+  }
+
+  void _listenToAuthChanges() {
+    _authSubscription?.cancel();
+    _authSubscription = supabase.Supabase.instance.client.auth.onAuthStateChange
+        .listen((data) async {
+          final session = data.session;
+          if (session == null) {
+            _state = const AuthState();
+            notifyListeners();
+            return;
+          }
+
+          try {
+            final user = await _authService.restoreSession();
+            _state = AuthState(user: user, isLoading: false, error: null);
+          } catch (error) {
+            _state = AuthState(
+              user: null,
+              isLoading: false,
+              error: error.toString(),
+            );
+          }
+          notifyListeners();
+        });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }
 
