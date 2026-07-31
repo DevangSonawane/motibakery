@@ -5,8 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/models/product.dart';
 import '../../../shared/models/order.dart';
+import '../../../shared/providers/inventory_provider.dart';
 import '../../../shared/providers/order_provider.dart';
+import '../../../shared/utils/product_image_resolver.dart';
 import '../../../shared/widgets/status_badge.dart';
 
 class CakeRoomOrderDetailScreen extends ConsumerStatefulWidget {
@@ -155,7 +158,7 @@ class _CakeRoomOrderDetailScreenState
     }
   }
 
-  void _openReferenceViewer(String imagePath) {
+  void _openImageViewer(String imagePath, {required String title}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(
@@ -163,7 +166,7 @@ class _CakeRoomOrderDetailScreenState
           appBar: AppBar(
             backgroundColor: Colors.black,
             foregroundColor: Colors.white,
-            title: const Text('Reference Image'),
+            title: Text(title),
           ),
           body: Center(
             child: InteractiveViewer(
@@ -177,10 +180,41 @@ class _CakeRoomOrderDetailScreenState
     );
   }
 
+  String? _displayImageUrl(String? rawPath) {
+    final trimmed = rawPath?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    final localFile = File(trimmed);
+    if (localFile.existsSync()) {
+      return trimmed;
+    }
+
+    return resolveProductImageNetworkUrl(trimmed) ?? trimmed;
+  }
+
+  String? _cakeImageUrl(Order order, List<Product> products) {
+    final orderUrl = _displayImageUrl(order.cakeImageUrl);
+    if (orderUrl != null) {
+      return orderUrl;
+    }
+
+    for (final product in products) {
+      if (product.id == order.cakeId || product.handle == order.cakeId) {
+        return _displayImageUrl(product.image);
+      }
+    }
+
+    return null;
+  }
+
   Widget _buildImage(String path, {required BoxFit fit}) {
     final uri = Uri.tryParse(path);
-    final isHttp = uri != null &&
-        (uri.scheme.toLowerCase() == 'http' || uri.scheme.toLowerCase() == 'https');
+    final isHttp =
+        uri != null &&
+        (uri.scheme.toLowerCase() == 'http' ||
+            uri.scheme.toLowerCase() == 'https');
 
     if (isHttp) {
       return Image.network(
@@ -193,8 +227,32 @@ class _CakeRoomOrderDetailScreenState
       );
     }
 
+    final localFile = File(path);
+    if (localFile.existsSync()) {
+      return Image.file(
+        localFile,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(
+          text: 'Unable to load image',
+          icon: Icons.broken_image_outlined,
+        ),
+      );
+    }
+
+    final resolved = resolveProductImageNetworkUrl(path);
+    if (resolved != null) {
+      return Image.network(
+        resolved,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(
+          text: 'Unable to load image',
+          icon: Icons.broken_image_outlined,
+        ),
+      );
+    }
+
     return Image.file(
-      File(path),
+      localFile,
       fit: fit,
       errorBuilder: (context, error, stackTrace) => _imagePlaceholder(
         text: 'Unable to load image',
@@ -208,6 +266,10 @@ class _CakeRoomOrderDetailScreenState
     final order = widget.order;
     final deliveryMeta = _deliveryMeta(order);
     final displayOrderId = _displayOrderId(order.id);
+    final inventoryProducts =
+        ref.watch(inventoryAllProductsProvider).valueOrNull ??
+        const <Product>[];
+    final cakeImageUrl = _cakeImageUrl(order, inventoryProducts);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Order Detail')),
@@ -216,14 +278,20 @@ class _CakeRoomOrderDetailScreenState
         child: order.status == OrderStatus.prepared
             ? Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.statusPreparedBg,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle, color: AppColors.statusPrepared),
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppColors.statusPrepared,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'This order is ready for pickup',
@@ -278,29 +346,26 @@ class _CakeRoomOrderDetailScreenState
             ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  order.cakeName,
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+          if (cakeImageUrl != null) ...[
+            InkWell(
+              onTap: () => _openImageViewer(cakeImageUrl, title: 'Cake Image'),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  height: 180,
+                  color: AppColors.surfaceGray,
+                  child: _buildImage(cakeImageUrl, fit: BoxFit.contain),
                 ),
               ),
-              if (order.cakeImageUrl != null) ...[
-                const SizedBox(width: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 120,
-                    height: 120,
-                    child: _buildImage(order.cakeImageUrl!, fit: BoxFit.cover),
-                  ),
-                ),
-              ],
-            ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          Text(
+            order.cakeName,
+            style: Theme.of(
+              context,
+            ).textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 18),
           Text(
@@ -335,7 +400,11 @@ class _CakeRoomOrderDetailScreenState
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(deliveryMeta.icon, size: 18, color: deliveryMeta.color),
+                    Icon(
+                      deliveryMeta.icon,
+                      size: 18,
+                      color: deliveryMeta.color,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -368,15 +437,17 @@ class _CakeRoomOrderDetailScreenState
             decoration: BoxDecoration(
               color: AppColors.primaryPale,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.24)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.24),
+              ),
             ),
             child: Text(
               order.notes?.trim().isNotEmpty == true
                   ? order.notes!
                   : 'No special instructions provided.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
           const SizedBox(height: 18),
@@ -387,7 +458,8 @@ class _CakeRoomOrderDetailScreenState
           const SizedBox(height: 8),
           if (order.imageUrl?.trim().isNotEmpty == true)
             InkWell(
-              onTap: () => _openReferenceViewer(order.imageUrl!),
+              onTap: () =>
+                  _openImageViewer(order.imageUrl!, title: 'Reference Image'),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: SizedBox(
@@ -420,9 +492,9 @@ class _CakeRoomOrderDetailScreenState
           width: 108,
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
         ),
         Expanded(
@@ -449,17 +521,13 @@ class _CakeRoomOrderDetailScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: AppColors.textHint,
-            size: 38,
-          ),
+          Icon(icon, color: AppColors.textHint, size: 38),
           const SizedBox(height: 8),
           Text(
             text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textHint,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
           ),
         ],
       ),

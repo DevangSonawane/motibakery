@@ -74,3 +74,87 @@ export async function createUserInSupabase(payload) {
     ...created,
   };
 }
+
+export async function updateUserInSupabase(payload) {
+  const token = getValidStoredSupabaseToken();
+  if (!token) {
+    throw new Error('Please sign in again to update users.');
+  }
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase env missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/admin-update-user`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      uid: payload.uid,
+      full_name: payload.name,
+      gmail: payload.email,
+      password: payload.password,
+      role: payload.role,
+    }),
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (response.status === 401) {
+      useAuthStore.getState().clearAuth();
+      throw new Error('Session expired or invalid. Please sign in again.');
+    }
+
+    const message =
+      body?.error || body?.message || body?.msg || 'Failed to update user from Supabase Edge Function.';
+    throw new Error(message);
+  }
+
+  const updated = body?.user || body;
+  return {
+    id: updated?.uid || payload.uid || nowIso(),
+    ...updated,
+  };
+}
+
+export async function deleteUserFromSupabase(uid) {
+  const token = getValidStoredSupabaseToken();
+  if (!token) {
+    throw new Error('Please sign in again to delete users.');
+  }
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase env missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/admin-delete-user`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ uid }),
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (response.status === 401) {
+      useAuthStore.getState().clearAuth();
+      throw new Error('Session expired or invalid. Please sign in again.');
+    }
+
+    const message =
+      body?.error || body?.message || body?.msg || 'Failed to delete user from Supabase Edge Function.';
+    throw new Error(message);
+  }
+
+  return body;
+}

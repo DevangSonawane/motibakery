@@ -6,6 +6,7 @@ Open Supabase SQL editor and run:
 - `supabase/sql/002_reset_users_minimal.sql`
 - `supabase/sql/003_create_products.sql`
 - `supabase/sql/004_seed_products_from_swiggy_menu.sql`
+- `supabase/sql/007_allow_user_deletion.sql`
 
 This creates:
 - `public.users` table
@@ -51,6 +52,8 @@ supabase secrets set SUPABASE_URL=https://jygsbebawnkvyaqohxes.supabase.co
 supabase secrets set SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
 supabase secrets set SUPABASE_SECRET_KEY=<your-secret-key>
 supabase functions deploy admin-create-user --project-ref jygsbebawnkvyaqohxes
+supabase functions deploy admin-update-user --project-ref jygsbebawnkvyaqohxes
+supabase functions deploy admin-delete-user --project-ref jygsbebawnkvyaqohxes
 ```
 
 ## 4) Frontend env

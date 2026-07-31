@@ -3,10 +3,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'PATCH, OPTIONS',
 };
 
-type CreateUserPayload = {
+type UpdateUserPayload = {
+  uid?: string;
+  id?: string;
   full_name?: string;
   fullName?: string;
   gmail?: string;
@@ -20,7 +22,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'PATCH') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -74,13 +76,13 @@ Deno.serve(async (req) => {
   }
 
   if (!callerProfile || callerProfile.role !== 'admin') {
-    return new Response(JSON.stringify({ error: 'Only admins can create users.' }), {
+    return new Response(JSON.stringify({ error: 'Only admins can update users.' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  let body: CreateUserPayload;
+  let body: UpdateUserPayload;
   try {
     body = await req.json();
   } catch {
@@ -90,10 +92,38 @@ Deno.serve(async (req) => {
     });
   }
 
-  const fullName = (body.full_name || body.fullName || '').trim();
-  const gmail = (body.gmail || body.email || '').trim().toLowerCase();
+  const uid = (body.uid || body.id || '').trim();
+  if (!uid) {
+    return new Response(JSON.stringify({ error: 'User id is required.' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { data: existingUser, error: existingUserError } = await adminClient
+    .from('users')
+    .select('uid,full_name,gmail,password,role')
+    .eq('uid', uid)
+    .maybeSingle();
+
+  if (existingUserError) {
+    return new Response(JSON.stringify({ error: existingUserError.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!existingUser) {
+    return new Response(JSON.stringify({ error: 'User not found.' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const fullName = (body.full_name || body.fullName || existingUser.full_name || '').trim();
+  const gmail = (body.gmail || body.email || existingUser.gmail || '').trim().toLowerCase();
   const password = body.password || '';
-  const role = body.role || 'counter';
+  const role = body.role || existingUser.role || 'counter';
 
   if (!fullName || fullName.length < 2) {
     return new Response(JSON.stringify({ error: 'Name must be at least 2 characters.' }), {
@@ -109,7 +139,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  if (!password || password.length < 8) {
+  if (password && password.length < 8) {
     return new Response(JSON.stringify({ error: 'Password must be at least 8 characters.' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -123,46 +153,86 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { data: createdAuth, error: createAuthError } = await adminClient.auth.admin.createUser({
+  const { data: gmailConflict, error: gmailConflictError } = await adminClient
+    .from('users')
+    .select('uid')
+    .eq('gmail', gmail)
+    .neq('uid', uid)
+    .maybeSingle();
+
+  if (gmailConflictError) {
+    return new Response(JSON.stringify({ error: gmailConflictError.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (gmailConflict) {
+    return new Response(JSON.stringify({ error: 'That Gmail address is already in use.' }), {
+      status: 409,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const authUpdatePayload: Record<string, unknown> = {
     email: gmail,
-    password,
-    email_confirm: true,
     user_metadata: {
       full_name: fullName,
       role,
     },
-  });
+  };
 
-  if (createAuthError || !createdAuth.user) {
-    return new Response(JSON.stringify({ error: createAuthError?.message || 'Failed to create auth user.' }), {
+  if (password) {
+    authUpdatePayload.password = password;
+  }
+
+  const { data: updatedAuth, error: updateAuthError } = await adminClient.auth.admin.updateUserById(uid, authUpdatePayload);
+  if (updateAuthError || !updatedAuth.user) {
+    return new Response(JSON.stringify({ error: updateAuthError?.message || 'Failed to update auth user.' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const row = {
-    uid: createdAuth.user.id,
+  const updateRow: Record<string, unknown> = {
     full_name: fullName,
     gmail,
-    password,
     role,
   };
 
-  const { data: inserted, error: insertError } = await adminClient
+  if (password) {
+    updateRow.password = password;
+  }
+
+  const { data: updatedUser, error: updateUserError } = await adminClient
     .from('users')
-    .insert(row)
+    .update(updateRow)
+    .eq('uid', uid)
     .select('uid,full_name,gmail,role')
     .single();
 
-  if (insertError) {
-    await adminClient.auth.admin.deleteUser(createdAuth.user.id).catch(() => {});
-    return new Response(JSON.stringify({ error: insertError.message }), {
+  if (updateUserError) {
+    const rollbackPayload: Record<string, unknown> = {
+      email: existingUser.gmail,
+      user_metadata: {
+        full_name: existingUser.full_name,
+        role: existingUser.role,
+      },
+    };
+
+    if (existingUser.password) {
+      rollbackPayload.password = existingUser.password;
+    }
+
+    await adminClient.auth.admin.updateUserById(uid, rollbackPayload).catch(() => {});
+
+    return new Response(JSON.stringify({ error: updateUserError.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  return new Response(JSON.stringify({ user: inserted }), {
+  return new Response(JSON.stringify({ user: updatedUser }), {
     status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
